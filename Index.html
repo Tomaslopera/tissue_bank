@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TissueBank — Sistema de matching de tejidos</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<!-- ============================= LOGIN ============================= -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="topbar-mark">
+        <img src="assets/logo-tissuebank.png" alt="Tissue Bank" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"/>
+        <div class="mark-fallback"><i class="ti ti-droplet-half-2"></i></div>
+      </div>
+      <div class="login-brand-text">Tissue<span>Bank</span></div>
+    </div>
+    <div class="login-title">Iniciar sesión</div>
+    <div class="login-sub">Sistema de matching de tejidos</div>
+
+    <div class="login-error" id="login-error">
+      <i class="ti ti-alert-triangle" style="font-size:14px"></i> Usuario o contraseña incorrectos.
+    </div>
+
+    <form id="login-form">
+      <div class="login-field form-group">
+        <label class="form-label">Usuario</label>
+        <input class="form-input" id="login-user" autocomplete="username" placeholder="ej. dr.martinez"/>
+      </div>
+      <div class="login-field form-group">
+        <label class="form-label">Contraseña</label>
+        <input class="form-input" id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••"/>
+      </div>
+      <button type="submit" class="btn-primary login-submit"><i class="ti ti-login-2" style="font-size:14px"></i> Entrar</button>
+    </form>
+
+    <div class="login-hint">
+      Demo — doctor: <code>dr.martinez</code> / <code>doctor123</code><br/>
+      Demo — administrador: <code>admin</code> / <code>admin123</code>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell" id="app-shell">
+
+  <!-- ============================= TOPBAR ============================= -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-mark">
+        <img src="assets/logo-tissuebank.png" alt="Tissue Bank" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"/>
+        <div class="mark-fallback"><i class="ti ti-droplet-half-2"></i></div>
+      </div>
+      <div>
+        <span class="topbar-logo">Tissue<span class="accent">Bank</span></span><span class="topbar-tagline">Sistema de matching de tejidos</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-clock" id="topbar-clock"></span>
+      <div class="topbar-user">
+        <span class="topbar-user-avatar" id="topbar-user-avatar">UD</span>
+        <span id="topbar-user-name">Usuario demo</span>
+      </div>
+      <button class="logout-btn" onclick="cerrarSesion()"><i class="ti ti-logout-2" style="font-size:14px"></i> Cerrar sesión</button>
+    </div>
+  </div>
+
+  <!-- ============================= SIDEBAR ============================= -->
+  <nav class="sidebar" aria-label="Navegación principal">
+    <div class="sidebar-section-label nav-doctor-only">Solicitud</div>
+    <button class="nav-btn nav-doctor-only active" data-panel="solicitantes" aria-current="true" onclick="showPanel('solicitantes',this)">
+      <i class="ti ti-stethoscope"></i><span class="nav-btn-text">Solicitantes</span>
+    </button>
+
+    <div class="sidebar-section-label nav-admin-only">Solicitud</div>
+    <button class="nav-btn nav-admin-only" data-panel="solicitudes-edison" aria-current="false" onclick="showPanel('solicitudes-edison',this)">
+      <i class="ti ti-list-details"></i><span class="nav-btn-text">Solicitudes</span>
+    </button>
+
+    <div class="sidebar-section-label nav-admin-only">Inventario</div>
+    <button class="nav-btn nav-admin-only" data-panel="tejidos" aria-current="false" onclick="showPanel('tejidos',this)">
+      <i class="ti ti-box"></i><span class="nav-btn-text">Tejidos</span>
+    </button>
+
+    <div class="sidebar-section-label nav-admin-only">Flujo de match</div>
+    <button class="nav-btn nav-admin-only" data-panel="recomendaciones" aria-current="false" onclick="showPanel('recomendaciones',this)">
+      <i class="ti ti-circles-relation"></i><span class="nav-btn-text">Recomendaciones</span>
+      <span class="nav-badge">2</span>
+    </button>
+    <button class="nav-btn nav-admin-only" data-panel="asignaciones" aria-current="false" onclick="showPanel('asignaciones',this)">
+      <i class="ti ti-clipboard-check"></i><span class="nav-btn-text">Asignaciones</span>
+      <span class="nav-badge">1</span>
+    </button>
+    <button class="nav-btn nav-admin-only" data-panel="etiquetado" aria-current="false" onclick="showPanel('etiquetado',this)">
+      <i class="ti ti-tag"></i><span class="nav-btn-text">Etiquetado</span>
+      <span class="nav-badge">1</span>
+    </button>
+
+    <div class="sidebar-section-label nav-admin-only">Administración</div>
+    <button class="nav-btn nav-admin-only" data-panel="doctores" aria-current="false" onclick="showPanel('doctores',this)">
+      <i class="ti ti-users"></i><span class="nav-btn-text">Doctores</span>
+    </button>
+
+    <div class="sidebar-section-label nav-doctor-only">Cuenta</div>
+    <button class="nav-btn nav-doctor-only" data-panel="perfil-doctor" aria-current="false" onclick="showPanel('perfil-doctor',this)">
+      <i class="ti ti-user-circle"></i><span class="nav-btn-text">Mi perfil</span>
+    </button>
+  </nav>
+
+  <!-- ============================= CONTENT ============================= -->
+  <main class="content">
+  <div class="content-inner">
+
+    <!-- PANEL 1: SOLICITANTES -->
+    <div class="panel active" id="panel-solicitantes">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel solicitantes</div>
+            <button class="info-btn" onclick="openModal('info-solicitantes')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-num" id="sol-stat-activas">—</div><div class="stat-lbl">Solicitudes activas</div></div>
+        <div class="stat info"><div class="stat-num" id="sol-stat-match-pendiente">—</div><div class="stat-lbl">Con match pendiente</div></div>
+        <div class="stat good"><div class="stat-num" id="sol-stat-asignadas">—</div><div class="stat-lbl">Asignadas / entregadas</div></div>
+        <div class="stat"><div class="stat-num" id="sol-stat-en-fila">—</div><div class="stat-lbl">En fila</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-toolbar">
+          <div class="card-title" style="margin-bottom:0"><span class="card-title-text"><i class="ti ti-list"></i>Mis solicitudes</span></div>
+          <button class="btn-primary" onclick="prepararModalNuevaSolicitud(); openModal('modal-nueva-solicitud')"><i class="ti ti-plus" style="font-size:13px"></i> Nueva solicitud</button>
+        </div>
+        <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Estado</th></tr></thead>
+          <tbody id="mis-solicitudes-body"></tbody>
+          </tbody>
+        </table>
+        <div id="mis-solicitudes-empty" class="table-empty" style="display:none">Aún no tienes solicitudes registradas.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL: Mi perfil (doctor_profile) -->
+    <div class="panel" id="panel-perfil-doctor">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Mi perfil</div>
+            <button class="info-btn" onclick="openModal('info-perfil-doctor')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:640px">
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-id"></i>Datos registrados</span></div>
+
+        <div class="notif-banner" style="display:none;background:var(--teal-soft);border-color:#B7E4CF;color:var(--teal-deep)" id="perfil-success-banner">
+          <i class="ti ti-circle-check" style="font-size:14px"></i> Perfil actualizado correctamente.
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cédula <span class="req">*</span></label>
+            <input class="form-input" id="perfil-id" value=""/>
+            <span class="form-hint">Identificador único del doctor (llave primaria en doctor_profile)</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre <span class="req">*</span></label>
+            <input class="form-input" id="perfil-nombre" value=""/>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Teléfono</label>
+            <input class="form-input" type="number" id="perfil-telefono" value=""/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" type="email" id="perfil-email" value=""/>
+          </div>
+        </div>
+
+        <div style="margin-top:6px">
+          <button class="btn-primary" onclick="guardarPerfilDoctor()"><i class="ti ti-device-floppy" style="font-size:13px"></i> Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: SOLICITUDES (Edison solo lectura) -->
+    <div class="panel" id="panel-solicitudes-edison">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel solicitudes</div>
+            <button class="info-btn" onclick="openModal('info-solicitudes')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-num" id="adm-stat-total">—</div><div class="stat-lbl">Total solicitudes</div></div>
+        <div class="stat info"><div class="stat-num" id="adm-stat-en-fila">—</div><div class="stat-lbl">En fila</div></div>
+        <div class="stat"><div class="stat-num" id="adm-stat-en-proceso">—</div><div class="stat-lbl">Con match en proceso</div></div>
+        <div class="stat good"><div class="stat-num" id="adm-stat-resueltas">—</div><div class="stat-lbl">Asignadas / entregadas</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-list-details"></i>Todas las solicitudes activas</span></div>
+        <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Doctor</th><th>Estado</th></tr></thead>
+          <tbody id="todas-solicitudes-body"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 3: TEJIDOS -->
+    <div class="panel" id="panel-tejidos">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel tejidos</div>
+            <button class="info-btn" onclick="openModal('info-tejidos')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="prepararModalNuevoDonante(); openModal('modal-nuevo-tejido')"><i class="ti ti-plus" style="font-size:13px"></i> Registrar donante / implante</button>
+      </div>
+      <div class="stats-row">
+        <div class="stat good"><div class="stat-num" id="tej-stat-disponibles">—</div><div class="stat-lbl">Implantes disponibles</div></div>
+        <div class="stat"><div class="stat-num" id="tej-stat-reservados">—</div><div class="stat-lbl">Reservados</div></div>
+        <div class="stat alert"><div class="stat-num" id="tej-stat-por-vencer">—</div><div class="stat-lbl">Por vencer</div></div>
+        <div class="stat"><div class="stat-num" id="tej-stat-donantes">—</div><div class="stat-lbl">Donantes activos</div></div>
+      </div>
+
+      <div class="panel-tabs" id="tab-tejidos">
+        <button class="panel-tab active" onclick="showTab('tab-tejidos','inventario',this)">
+          <i class="ti ti-box"></i> Inventario disponible <span class="panel-tab-count" id="tej-tab-count-inventario">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-tejidos','vencer',this)">
+          <i class="ti ti-clock-exclamation"></i> Por vencer <span class="panel-tab-count count-alert" id="tej-tab-count-vencer">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-tejidos','historial',this)">
+          <i class="ti ti-history"></i> Historial de donantes
+        </button>
+      </div>
+
+      <!-- TAB: Inventario disponible -->
+      <div class="tab-pane active" id="tab-tejidos-inventario">
+        <div id="inventario-donor-groups"></div>
+        <div id="inventario-vacio" class="table-empty" style="display:none">No hay implantes disponibles en este momento.</div>
+      </div>
+
+      <!-- TAB: Por vencer -->
+      <div class="tab-pane" id="tab-tejidos-vencer">
+        <div id="vencer-donor-groups"></div>
+        <div id="vencer-vacio" class="table-empty" style="display:none">No hay implantes próximos a vencer.</div>
+      </div>
+
+      <!-- TAB: Historial de donantes -->
+      <div class="tab-pane" id="tab-tejidos-historial">
+        <div class="card">
+          <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Código donante</th>
+                <th>Parte del cuerpo</th>
+                <th>Tipo implante</th>
+                <th>Dimensiones (mm)</th>
+                <th>Vencimiento</th>
+                <th>Estado final</th>
+              </tr>
+            </thead>
+            <tbody id="historial-donantes-body"></tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 4: RECOMENDACIONES -->
+    <div class="panel" id="panel-recomendaciones">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel recomendaciones</div>
+            <button class="info-btn" onclick="openModal('info-recomendaciones')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-num" id="reco-stat-detectados">—</div><div class="stat-lbl">Matches detectados</div></div>
+        <div class="stat info"><div class="stat-num" id="reco-stat-por-enviar">—</div><div class="stat-lbl">Por enviar</div></div>
+        <div class="stat warn"><div class="stat-num" id="reco-esperando-stat">—</div><div class="stat-lbl">Esperando doctor</div></div>
+        <div class="stat good"><div class="stat-num" id="reco-stat-aprobados">—</div><div class="stat-lbl">Aprobados este mes</div></div>
+      </div>
+
+      <div class="panel-tabs" id="tab-reco">
+        <button class="panel-tab active" onclick="showTab('tab-reco','pendientes',this)">
+          <i class="ti ti-circles-relation"></i> Por enviar <span class="panel-tab-count" id="reco-pendientes-count">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-reco','esperando',this)">
+          <i class="ti ti-mail-forward"></i> Esperando doctor <span class="panel-tab-count" id="reco-esperando-count">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-reco','historial',this)">
+          <i class="ti ti-history"></i> Historial
+        </button>
+      </div>
+
+      <!-- TAB: Por enviar -->
+      <div class="tab-pane active" id="tab-reco-pendientes">
+        <div id="matches-pendientes-list"></div>
+        <div id="matches-pendientes-vacio" class="table-empty" style="display:none">No hay matches nuevos por enviar.</div>
+      </div>
+
+      <!-- TAB: Esperando doctor -->
+      <div class="tab-pane" id="tab-reco-esperando">
+        <div id="matches-esperando-list"></div>
+        <div class="table-empty" id="reco-esperando-empty" style="padding:18px 4px">Los matches enviados desde la pestaña "Por enviar" aparecerán aquí mientras se espera respuesta del doctor.</div>
+      </div>
+
+      <!-- TAB: Historial -->
+      <div class="tab-pane" id="tab-reco-historial">
+        <div class="card">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Paciente</th><th>Tejido</th><th>Compatibilidad</th><th>Respuesta doctor</th><th>Enviado</th></tr></thead>
+            <tbody id="reco-historial-body"></tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 5: ASIGNACIONES -->
+    <div class="panel" id="panel-asignaciones">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel asignaciones</div>
+            <button class="info-btn" onclick="openModal('info-asignaciones')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat good"><div class="stat-num" id="asig-stat-aprobadas">—</div><div class="stat-lbl">Aprobadas</div></div>
+        <div class="stat alert"><div class="stat-num" id="stat-pend">—</div><div class="stat-lbl">Pendientes</div></div>
+        <div class="stat"><div class="stat-num" id="asig-stat-rechazadas">—</div><div class="stat-lbl">Rechazadas</div></div>
+        <div class="stat"><div class="stat-num" id="asig-stat-total">—</div><div class="stat-lbl">Total</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-clock-check"></i>Pendientes — doctor ya confirmó</span></div>
+        <div id="asig-pending"></div>
+        <div id="asig-done" style="display:none;padding:30px;text-align:center;color:var(--ink-faint);font-size:12px">
+          <i class="ti ti-check" style="font-size:28px;color:var(--teal);display:block;margin-bottom:8px"></i>Sin pendientes — todo al día
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-history"></i>Historial de asignaciones</span></div>
+        <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Paciente</th><th>Tejido</th><th>IPS</th><th>Estado</th></tr></thead>
+          <tbody id="hist-body"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 6: ETIQUETADO -->
+    <div class="panel" id="panel-etiquetado">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel etiquetado</div>
+            <button class="info-btn" onclick="openModal('info-etiquetado')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat" id="etiq-pend-stat"><div class="stat-num" id="etiq-pend">—</div><div class="stat-lbl">Por etiquetar</div></div>
+        <div class="stat"><div class="stat-num" id="etiq-stat-camino">—</div><div class="stat-lbl">En camino</div></div>
+        <div class="stat good"><div class="stat-num" id="etiq-stat-entregados">—</div><div class="stat-lbl">Entregados</div></div>
+        <div class="stat"><div class="stat-num" id="etiq-stat-total">—</div><div class="stat-lbl">Total</div></div>
+      </div>
+
+      <div class="panel-tabs" id="tab-etiq">
+        <button class="panel-tab active" onclick="showTab('tab-etiq','pendientes',this)">
+          <i class="ti ti-tag"></i> Por etiquetar <span class="panel-tab-count" id="etiq-tab-count">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-etiq','camino',this)">
+          <i class="ti ti-truck-delivery"></i> En camino <span class="panel-tab-count" id="etiq-tab-count-camino">0</span>
+        </button>
+        <button class="panel-tab" onclick="showTab('tab-etiq','entregados',this)">
+          <i class="ti ti-history"></i> Entregados
+        </button>
+      </div>
+
+      <!-- TAB: Por etiquetar -->
+      <div class="tab-pane active" id="tab-etiq-pendientes">
+        <div id="etiq-pending-card"></div>
+        <div id="etiq-done" style="padding:30px;text-align:center;color:var(--ink-faint);font-size:12px">
+          <i class="ti ti-check" style="font-size:28px;color:var(--teal);display:block;margin-bottom:8px"></i>Sin tejidos pendientes de etiquetar
+        </div>
+      </div>
+
+      <!-- TAB: En camino -->
+      <div class="tab-pane" id="tab-etiq-camino">
+        <div id="etiq-camino-list"></div>
+        <div id="etiq-camino-vacio" class="table-empty" style="display:none">No hay tejidos en camino actualmente.</div>
+      </div>
+
+      <!-- TAB: Entregados -->
+      <div class="tab-pane" id="tab-etiq-entregados">
+        <div class="card">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Tejido</th><th>Paciente</th><th>IPS destino</th><th>Estado</th></tr></thead>
+            <tbody id="despacho-body"></tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL: Doctores (admin) -->
+    <div class="panel" id="panel-doctores">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title-row">
+            <div class="panel-title">Panel doctores</div>
+            <button class="info-btn" onclick="openModal('info-doctores')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="prepararModalNuevoDoctor(); openModal('modal-nuevo-doctor')"><i class="ti ti-plus" style="font-size:13px"></i> Nuevo doctor</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-num" id="doc-stat-total">—</div><div class="stat-lbl">Doctores registrados</div></div>
+        <div class="stat good"><div class="stat-num" id="doc-stat-activos">—</div><div class="stat-lbl">Cuentas activas</div></div>
+        <div class="stat"><div class="stat-num" id="doc-stat-inactivos">—</div><div class="stat-lbl">Cuentas desactivadas</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-users"></i>Doctores registrados</span></div>
+        <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Nombre</th><th>Cédula</th><th>Usuario</th><th>Teléfono</th><th>Email</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody id="doctores-body"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </main>
+</div>
+
+<!-- ======================================================================
+     MODAL: Nueva solicitud (flotante, se abre desde "Panel solicitantes")
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-nueva-solicitud">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Nueva solicitud de tejido</div>
+        <div class="modal-head-sub">Se guardará asociada al doctor autenticado en este momento</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-nueva-solicitud')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+
+      <div class="notif-banner" style="display:flex;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="sol-form-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> Completa los campos marcados para poder enviar la solicitud.
+      </div>
+      <div class="notif-banner" style="display:none;background:var(--teal-soft);border-color:#B7E4CF;color:var(--teal-deep)" id="sol-success-banner">
+        <i class="ti ti-circle-check" style="font-size:14px"></i> Solicitud enviada correctamente. Se notificará cuando exista un match compatible.
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-user"></i>Datos del paciente</div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Tipo de identificación <span class="req">*</span></label>
+          <select class="form-input" id="sol-tipo-identificacion">
+            <option value="">Seleccionar...</option>
+            <option value="CC">Cédula de ciudadanía</option>
+            <option value="TI">Tarjeta de identidad</option>
+            <option value="CE">Cédula de extranjería</option>
+            <option value="PA">Pasaporte</option>
+          </select>
+          <span class="field-error" id="sol-tipo-identificacion-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre <span class="req">*</span></label>
+          <input class="form-input" id="sol-nombre" value="" placeholder="Ej: Carlos Andrés"/>
+          <span class="field-error" id="sol-nombre-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Apellido <span class="req">*</span></label>
+          <input class="form-input" id="sol-apellido" value="" placeholder="Ej: Martínez López"/>
+          <span class="field-error" id="sol-apellido-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Fecha de nacimiento</label>
+          <input class="form-input" type="date" id="sol-fecha-nac" value=""/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Edad</label>
+          <input class="form-input" type="number" id="sol-edad" value="" placeholder="Ej: 40"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nacionalidad</label>
+          <input class="form-input" id="sol-nacionalidad" value="" placeholder="Ej: Colombiana"/>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-building-hospital"></i>IPS</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre de la IPS <span class="req">*</span></label>
+          <input class="form-input" id="sol-ips-nombre" value="" placeholder="Ej: Clínica Las Américas"/>
+          <span class="field-error" id="sol-ips-nombre-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ciudad</label>
+          <input class="form-input" id="sol-ips-ciudad" value="" placeholder="Ej: Medellín"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Dirección</label>
+          <input class="form-input" id="sol-ips-direccion" value="" placeholder="Ej: Cra 43A #34-95"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-input" id="sol-ips-telefono" value="" placeholder="Ej: 6044448899"/>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-droplet"></i>Datos del tejido requerido</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tejido solicitado <span class="req">*</span></label>
+          <input class="form-input" id="sol-tejido-tipo" value="" placeholder="Ej: Piel, Hueso..."/>
+          <span class="field-error" id="sol-tejido-tipo-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Procedimiento quirúrgico</label>
+          <input class="form-input" id="sol-procedimiento" value="" placeholder="Ej: Injerto cutáneo"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Fecha estimada de cirugía <span class="req">*</span></label>
+          <input class="form-input" type="date" id="sol-fecha-cirugia" value=""/>
+          <span class="field-error" id="sol-fecha-cirugia-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Alto requerido (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="sol-alto" value="" placeholder="mm"/>
+          <span class="field-error" id="sol-alto-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ancho requerido (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="sol-ancho" value="" placeholder="mm"/>
+          <span class="field-error" id="sol-ancho-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Profundidad requerida (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="sol-prof" value="" placeholder="mm"/>
+          <span class="field-error" id="sol-prof-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-notes"></i>Diagnóstico</div>
+      <div class="form-group">
+        <label class="form-label">Diagnóstico</label>
+        <textarea class="form-input" id="sol-diagnostico" rows="3" placeholder="Describe el diagnóstico del paciente..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-nueva-solicitud')">Cancelar</button>
+      <button class="btn-primary" onclick="enviarSolicitud()"><i class="ti ti-send" style="font-size:13px"></i> Enviar solicitud</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Nuevo donante / implante (Panel tejidos)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-nuevo-tejido">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Registrar donante e implantes</div>
+        <div class="modal-head-sub">Registra el donante y los implantes obtenidos de él</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-nuevo-tejido')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+
+      <div class="section-label"><i class="ti ti-1-circle"></i>Datos del donante</div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Código donante (INML)</label>
+          <input class="form-input" id="donante-codigo" value="" placeholder="Ej: R3 INML 26.290" oninput="actualizarBadgeDonante()"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de extracción</label>
+          <input class="form-input" type="date" id="donante-fecha-extraccion" value=""/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de procesamiento</label>
+          <input class="form-input" type="date" id="donante-fecha-procedimiento" value=""/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">2° cambio</label>
+          <input class="form-input" type="date" id="donante-fecha-segundo-cambio" value=""/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de vencimiento</label>
+          <input class="form-input" type="date" id="donante-fecha-vencimiento" value=""/>
+        </div>
+      </div>
+      <div class="warn-note">
+        <i class="ti ti-clock" style="font-size:14px"></i>
+        La fecha de vencimiento es fija por donante y aplica a todos sus implantes.
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section-label" style="justify-content:space-between;display:flex;align-items:center">
+        <span style="display:flex;align-items:center;gap:7px"><i class="ti ti-2-circle"></i>Implantes de este donante</span>
+        <span class="code-badge" id="modal-donante-codigo-badge">(sin código)</span>
+      </div>
+
+      <div id="implantes-lista"></div>
+      <div id="implantes-lista-vacia" class="table-empty" style="display:none">Aún no se ha agregado ningún implante para este donante.</div>
+
+      <div class="new-implant-box">
+        <div class="new-implant-label" id="implant-form-label"><i class="ti ti-plus" style="color:var(--teal)"></i> Agregar nuevo implante</div>
+        <input type="hidden" id="implant-edit-index" value=""/>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Parte del cuerpo <span class="req">*</span></label>
+            <select class="form-input" id="implant-parte-cuerpo">
+              <option value="">Seleccionar...</option>
+              <option>Rodilla derecha</option>
+              <option>Rodilla izquierda</option>
+              <option>Cadera derecha</option>
+              <option>Cadera izquierda</option>
+              <option>Talo derecho</option>
+              <option>Talo izquierdo</option>
+              <option>Columna</option>
+              <option>Espalda</option>
+              <option>Otro</option>
+            </select>
+            <span class="field-error" id="implant-parte-cuerpo-error">Este campo es obligatorio</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de implante <span class="req">*</span></label>
+            <select class="form-input" id="implant-tipo-implante">
+              <option value="">Seleccionar...</option>
+              <option>Cóndilo</option>
+              <option>Patela</option>
+              <option>Plato tibial</option>
+              <option>Fémur</option>
+              <option>Talo</option>
+              <option>Menisco medial</option>
+              <option>Menisco lateral</option>
+              <option>Piel</option>
+              <option>Hueso</option>
+              <option>Otro</option>
+            </select>
+            <span class="field-error" id="implant-tipo-implante-error">Este campo es obligatorio</span>
+          </div>
+        </div>
+        <div class="form-row three">
+          <div class="form-group">
+            <label class="form-label">Alto (mm) <span class="req">*</span></label>
+            <input class="form-input" type="number" id="implant-alto" value=""/>
+            <span class="field-error" id="implant-alto-error">Este campo es obligatorio</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+            <input class="form-input" type="number" id="implant-ancho" value=""/>
+            <span class="field-error" id="implant-ancho-error">Este campo es obligatorio</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estado</label>
+            <select class="form-input" id="implant-estado">
+              <option value="disponible">Disponible</option>
+              <option value="reservado">Reservado</option>
+              <option value="asignado">Asignado</option>
+              <option value="contraindicado">Contraindicado</option>
+              <option value="vencido">Vencido</option>
+              <option value="despachado">Despachado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas adicionales</label>
+          <input class="form-input" id="implant-notas" placeholder="Ej: IPS no autorizó, no se operó el hato..."/>
+        </div>
+
+        <div class="form-group" style="margin-top:4px">
+          <label class="form-label">Fotografía del implante</label>
+          <div class="upload-box" role="button" tabindex="0" onclick="document.getElementById('implant-foto-input').click()" id="implant-upload-box">
+            <i class="ti ti-upload" id="implant-upload-icon"></i>
+            <div style="font-size:12px;color:var(--ink-soft);margin-top:6px" id="implant-upload-text">Arrastra la foto aquí o haz clic para subir · PNG, JPG · Máx 10 MB</div>
+            <img id="implant-foto-preview" style="display:none;max-height:110px;border-radius:8px;margin-top:8px"/>
+          </div>
+          <input type="file" id="implant-foto-input" accept="image/png,image/jpeg" style="display:none" onchange="previsualizarFotoImplante(this)"/>
+          <span class="form-hint" id="implant-foto-hint"></span>
+          <!-- url_imagen: en producción, al seleccionar el archivo se sube de inmediato a un
+               bucket S3 (vía URL pre-firmada que entrega el backend) y esta variable guarda
+               la URL resultante — no el archivo. Aquí se simula con una URL local (object URL)
+               solo para previsualizar dentro del navegador. -->
+          <input type="hidden" id="implant-url-imagen" value=""/>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <button class="btn-primary" id="implant-guardar-btn" onclick="guardarImplanteEnLista()"><i class="ti ti-plus" style="font-size:13px"></i> Agregar implante a esta lista</button>
+          <button class="btn-outline" id="implant-cancelar-edicion-btn" style="display:none" onclick="cancelarEdicionImplante()">Cancelar edición</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-nuevo-tejido')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarDonanteEImplantes()"><i class="ti ti-check" style="font-size:13px"></i> Guardar donante e implantes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Detalle de implante (Panel Tejidos)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-detalle-implante">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title" id="det-implante-titulo">Implante</div>
+        <div class="modal-head-sub">Donante <span id="det-implante-donor-codigo" class="code-badge" style="vertical-align:middle"></span></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-detalle-implante')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div id="det-implante-foto-wrap" style="display:none;margin-bottom:16px">
+        <img id="det-implante-foto" style="width:100%;max-height:220px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--line-soft)"/>
+      </div>
+
+      <div class="section-label"><i class="ti ti-box"></i>Datos del implante</div>
+      <div class="etiq-grid" style="margin-bottom:16px">
+        <div class="etiq-field"><div class="etiq-label">Parte del cuerpo</div><div class="etiq-value" id="det-implante-parte">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Tipo de implante</div><div class="etiq-value" id="det-implante-tipo">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Dimensiones (mm)</div><div class="etiq-value" id="det-implante-dims">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Estado</div><div class="etiq-value" id="det-implante-estado">—</div></div>
+      </div>
+
+      <div id="det-implante-notas-wrap" style="display:none;margin-bottom:16px">
+        <div class="section-label"><i class="ti ti-notes"></i>Notas adicionales</div>
+        <p style="font-size:12.5px;color:var(--ink-soft);margin:0" id="det-implante-notas"></p>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-droplet"></i>Datos del donante</div>
+      <div class="etiq-grid">
+        <div class="etiq-field"><div class="etiq-label">Código donante</div><div class="etiq-value" id="det-implante-donor-codigo-2">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Fecha de extracción</div><div class="etiq-value" id="det-implante-donor-extraccion">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Fecha de vencimiento</div><div class="etiq-value" id="det-implante-donor-vencimiento">—</div></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-detalle-implante')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Detalle de solicitud (Panel Solicitantes / Solicitudes admin)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-detalle-solicitud">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title" id="det-sol-titulo">Solicitud</div>
+        <div class="modal-head-sub" id="det-sol-codigo"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-detalle-solicitud')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="section-label"><i class="ti ti-user"></i>Paciente</div>
+      <div class="etiq-grid" style="margin-bottom:16px">
+        <div class="etiq-field"><div class="etiq-label">Nombre</div><div class="etiq-value" id="det-sol-paciente">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Identificación</div><div class="etiq-value" id="det-sol-cedula">—</div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-building-hospital"></i>IPS y cirugía</div>
+      <div class="etiq-grid" style="margin-bottom:16px">
+        <div class="etiq-field"><div class="etiq-label">IPS</div><div class="etiq-value" id="det-sol-ips">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Fecha estimada de cirugía</div><div class="etiq-value" id="det-sol-fecha">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Médico solicitante</div><div class="etiq-value" id="det-sol-doctor">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Procedimiento quirúrgico</div><div class="etiq-value" id="det-sol-procedimiento">—</div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-droplet"></i>Tejido requerido</div>
+      <div class="etiq-grid" style="margin-bottom:16px">
+        <div class="etiq-field"><div class="etiq-label">Tejido solicitado</div><div class="etiq-value" id="det-sol-tejido">—</div></div>
+        <div class="etiq-field"><div class="etiq-label">Dimensiones</div><div class="etiq-value" id="det-sol-dimensiones">—</div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-notes"></i>Diagnóstico</div>
+      <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 16px" id="det-sol-diagnostico">—</p>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-list-check"></i>Estado actual</div>
+      <span class="badge badge-lg" id="det-sol-estado-badge">—</span>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-detalle-solicitud')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Nuevo doctor (Panel Doctores)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-nuevo-doctor">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Nuevo doctor</div>
+        <div class="modal-head-sub">Se creará una cuenta con acceso al Panel Solicitantes</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-nuevo-doctor')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="notif-banner" style="display:flex;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="doc-form-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="doc-form-error-msg">Completa los campos marcados para poder crear la cuenta.</span>
+      </div>
+
+      <div class="section-label"><i class="ti ti-id"></i>Datos del doctor</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cédula <span class="req">*</span></label>
+          <input class="form-input" id="doc-cedula" placeholder="Ej: 71234509"/>
+          <span class="field-error" id="doc-cedula-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre completo <span class="req">*</span></label>
+          <input class="form-input" id="doc-nombre" placeholder="Ej: Dr. Andrés Martínez"/>
+          <span class="field-error" id="doc-nombre-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-input" type="number" id="doc-telefono" placeholder="Ej: 3104567890"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="doc-email" placeholder="Ej: nombre@tissuebank.co"/>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label"><i class="ti ti-lock"></i>Acceso al sistema</div>
+      <div class="form-group">
+        <label class="form-label">Usuario <span class="req">*</span></label>
+        <input class="form-input" id="doc-username" placeholder="Ej: dr.apellido"/>
+        <span class="form-hint">La contraseña se genera automáticamente y se mostrará una sola vez al crear la cuenta.</span>
+        <span class="field-error" id="doc-username-error">Este campo es obligatorio</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-nuevo-doctor')">Cancelar</button>
+      <button class="btn-primary" onclick="crearDoctorUI()"><i class="ti ti-user-plus" style="font-size:13px"></i> Crear cuenta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Editar doctor (Panel Doctores)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-editar-doctor">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Editar doctor</div>
+        <div class="modal-head-sub">Cédula y usuario no se pueden modificar una vez creada la cuenta</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-editar-doctor')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-doc-user-id" value=""/>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cédula</label>
+          <input class="form-input" id="edit-doc-cedula" disabled/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Usuario</label>
+          <input class="form-input" id="edit-doc-username" disabled/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre completo <span class="req">*</span></label>
+        <input class="form-input" id="edit-doc-nombre"/>
+        <span class="field-error" id="edit-doc-nombre-error">Este campo es obligatorio</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teléfono</label>
+          <input class="form-input" type="number" id="edit-doc-telefono"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="edit-doc-email"/>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <button class="btn-outline" onclick="resetPasswordUI(document.getElementById('edit-doc-user-id').value)"><i class="ti ti-key" style="font-size:13px"></i> Restablecer contraseña</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-editar-doctor')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarEdicionDoctorUI()"><i class="ti ti-check" style="font-size:13px"></i> Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Credenciales generadas (se muestra UNA sola vez)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-credenciales">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cuenta creada correctamente</div>
+        <div class="modal-head-sub">Copia esta contraseña ahora — no se volverá a mostrar</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="warn-note" style="margin-bottom:16px">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i>
+        Por seguridad, el sistema no guarda esta contraseña en texto plano — si se cierra este modal sin copiarla, la única forma de recuperarla es restablecerla de nuevo.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Usuario</label>
+        <input class="form-input generated" id="cred-username" readonly/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña temporal</label>
+        <div style="display:flex;gap:8px">
+          <input class="form-input generated" id="cred-password" readonly style="font-family:var(--font-mono);letter-spacing:.03em"/>
+          <button class="btn-icon-only" onclick="copiarCredencial('cred-password')" title="Copiar contraseña"><i class="ti ti-copy"></i></button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-primary" onclick="closeModal('modal-credenciales')">Ya la copié, cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODALES INFORMATIVOS — uno por panel, con el detalle de flujo/acceso
+     ====================================================================== -->
+
+<div class="modal-overlay" id="info-doctores">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Doctores</div>
+        <div class="modal-head-sub">Gestión de cuentas de acceso para doctores</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-doctores')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Aquí el administrador crea las cuentas con las que cada doctor entra al sistema. Al crear una cuenta se genera una contraseña temporal que se muestra una única vez — el administrador debe copiarla y entregársela al doctor por un medio seguro.</p>
+        <p>Desactivar una cuenta le quita el acceso al doctor sin borrar su historial de solicitudes ya creadas. Se puede reactivar en cualquier momento.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-solicitantes">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Solicitantes</div>
+        <div class="modal-head-sub">Cada doctor inicia sesión con su propia cuenta y ve solo sus casos</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-solicitantes')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Este panel es el punto de entrada de cada caso. Al iniciar sesión, cada doctor ve únicamente sus propias solicitudes — nunca las de otros doctores — porque el acceso está atado a su cuenta.</p>
+      </div>
+      <div class="info-steps">
+        <div class="info-step">
+          <div class="info-step-num">1</div>
+          <div class="info-step-body">
+            <div class="info-step-title">El doctor completa la solicitud</div>
+            <div class="info-step-desc">Datos del paciente, la IPS y las dimensiones del tejido requerido.</div>
+          </div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">2</div>
+          <div class="info-step-body">
+            <div class="info-step-title">El sistema registra la solicitud</div>
+            <div class="info-step-desc">Queda asociada al paciente, la IPS y el doctor que la creó.</div>
+          </div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">3</div>
+          <div class="info-step-body">
+            <div class="info-step-title">Queda en fila esperando un match</div>
+            <div class="info-step-desc">Cuando exista un tejido compatible, avanza automáticamente a recomendaciones.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-perfil-doctor">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Mi perfil</div>
+        <div class="modal-head-sub">Datos guardados en doctor_profile</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-perfil-doctor')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Aquí el doctor puede ver y actualizar los datos que el sistema guarda sobre él: cédula, nombre, teléfono y correo. Estos datos son distintos del usuario y contraseña de acceso — son la información de contacto que otros paneles usan para mostrar quién solicitó o aprobó cada caso.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-solicitudes">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Solicitudes</div>
+        <div class="modal-head-sub">Vista de administrador, solo lectura</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-solicitudes')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Vista consolidada de <strong>todas</strong> las solicitudes ingresadas por todos los doctores, sin importar quién la creó. Sirve para tener una visión general de la demanda de tejidos y priorizar el trabajo de búsqueda.</p>
+        <p>Es de solo lectura: los cambios sobre una solicitud (editarla, cancelarla) los hace únicamente el doctor que la creó desde su propio panel.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-tejidos">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Tejidos</div>
+        <div class="modal-head-sub">Vista de administrador, registro de inventario</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-tejidos')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Aquí se registra el inventario disponible: primero los datos del donante (una fecha de vencimiento fija que aplica a todos sus implantes), y luego cada implante individual que se obtuvo de ese donante.</p>
+        <p>Cada implante registrado queda disponible para que el sistema busque coincidencias dimensionales con las solicitudes activas en el panel de recomendaciones.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-recomendaciones">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Recomendaciones</div>
+        <div class="modal-head-sub">Vista de administrador, revisión y envío de matches</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-recomendaciones')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>El sistema detecta automáticamente coincidencias dimensionales entre solicitudes activas e implantes disponibles, calculando un porcentaje de compatibilidad por cada medida (alto, ancho, profundidad).</p>
+      </div>
+      <div class="info-steps">
+        <div class="info-step">
+          <div class="info-step-num">1</div>
+          <div class="info-step-body"><div class="info-step-title">Match detectado</div><div class="info-step-desc">El sistema encuentra un implante compatible con una solicitud.</div></div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">2</div>
+          <div class="info-step-body"><div class="info-step-title">Edison revisa y envía</div><div class="info-step-desc">Confirma que la compatibilidad es adecuada y notifica al doctor.</div></div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">3</div>
+          <div class="info-step-body"><div class="info-step-title">Doctor recibe correo</div><div class="info-step-desc">Se le notifica el match para que decida si lo acepta.</div></div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">4</div>
+          <div class="info-step-body"><div class="info-step-title">Doctor decide</div><div class="info-step-desc">Aprueba o rechaza el tejido propuesto.</div></div>
+        </div>
+        <div class="info-step">
+          <div class="info-step-num">5</div>
+          <div class="info-step-body"><div class="info-step-title">Pasa a asignaciones</div><div class="info-step-desc">Si el doctor aprueba, el caso queda pendiente de aprobación final por Isabel.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-asignaciones">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Asignaciones</div>
+        <div class="modal-head-sub">Vista de administrador, aprobación final</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-asignaciones')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Aquí llegan los casos que el doctor ya confirmó desde el panel de recomendaciones. Isabel da la aprobación final antes de que el tejido pase a etiquetado y despacho — es el último control antes de comprometer el inventario.</p>
+        <p>Si rechaza un caso, el tejido vuelve a quedar disponible para otras solicitudes.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="info-etiquetado">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Cómo funciona: Etiquetado</div>
+        <div class="modal-head-sub">Vista de administrador, etiquetado y despacho</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('info-etiquetado')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-body-text">
+        <p>Los tejidos que ya fueron aprobados por Isabel llegan automáticamente a este panel, listos para ser etiquetados físicamente y enviados a la IPS de destino. No requiere ingreso manual de datos: todo se carga desde la base de datos.</p>
+        <p>Al marcar un tejido como etiquetado, pasa al historial de despachos con estado "En camino".</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
