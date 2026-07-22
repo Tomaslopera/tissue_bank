@@ -166,6 +166,8 @@ const DB = {
     { id: 'match-maria',    request_id: 'req-maria',    implant_id: 'imp-tej-005', compatibility_score: 91, compatibility_alto: 93,   compatibility_ancho: 91,  compatibility_profundidad: 89,  status: 'aprobado_admin', sent_at: isoDateTime(-9) },
     { id: 'match-jorge',    request_id: 'req-jorge',    implant_id: 'imp-tej-006', compatibility_score: 88, compatibility_alto: 90,   compatibility_ancho: 87,  compatibility_profundidad: 86,  status: 'aprobado_admin', sent_at: isoDateTime(-6) },
     { id: 'match-patricia', request_id: 'req-patricia', implant_id: 'imp-tej-009', compatibility_score: 76, compatibility_alto: 80,   compatibility_ancho: 74,  compatibility_profundidad: 70,  status: 'rechazado_doctor', sent_at: isoDateTime(-12) },
+    // Match enviado al Dr. Martínez — aparece en "Match por aprobar" en su panel
+    { id: 'match-sandra-new', request_id: 'req-sandra', implant_id: 'imp-r3-3', compatibility_score: 88, compatibility_alto: 92, compatibility_ancho: 85, compatibility_profundidad: 88, status: 'enviado', sent_at: isoDateTime(-1) },
   ],
   // req-sofia no tiene match todavía (en_fila, esperando que el motor de matching encuentre candidato).
 
@@ -468,6 +470,31 @@ const API = {
       const m = DB.match.find(x=>x.id===matchId);
       if(!m) return null;
       m.sent_at = new Date().toISOString();
+      return clone(m);
+    },
+    approveDoctor(matchId, doctorUserId){
+      const m = DB.match.find(x=>x.id===matchId);
+      if(!m) return null;
+      m.status = 'aprobado_doctor';
+      m.decided_by = doctorUserId;
+      m.decided_at = new Date().toISOString();
+      // Crear asignación pendiente para que Isabel la apruebe
+      const already = DB.assignment.find(a=>a.match_id===matchId);
+      if(!already){
+        DB.assignment.push({ id: 'asig-' + matchId, match_id: matchId, status: 'pendiente', reviewed_by: null });
+      }
+      return clone(m);
+    },
+    rejectDoctor(matchId, doctorUserId, reason){
+      const m = DB.match.find(x=>x.id===matchId);
+      if(!m) return null;
+      m.status = 'rechazado_doctor';
+      m.decided_by = doctorUserId;
+      m.decided_at = new Date().toISOString();
+      m.rejection_reason = reason || '';
+      // Liberar el implante para otras solicitudes
+      const implant = DB.implant.find(i=>i.id===m.implant_id);
+      if(implant && implant.estado === 'reservado') implant.estado = 'disponible';
       return clone(m);
     },
   },
