@@ -1250,11 +1250,116 @@ function abrirDetalleSolicitud(requestId){
 }
 
 // ==========================================================================
+// Panel Solicitantes — Matches por aprobar (doctor)
+// ==========================================================================
+function buildMatchCardDoctor(m){
+  const req     = API.requests.getById(m.request_id);
+  const patient = API.compose.patient(req.patient_id);
+  const implant = API.compose.implant(m.implant_id);
+  const ips     = API.compose.ips(req.ips_id);
+  const scoreClass = m.compatibility_score >= 85 ? '' : (m.compatibility_score >= 70 ? 'mid' : 'low');
+
+  const card = document.createElement('div');
+  card.className = 'match-card-v2';
+  card.id = 'doctor-mc-' + m.id;
+  card.innerHTML = `
+    <div class="match-v2-summary" onclick="toggleMatch('doctor-mc-${m.id}')">
+      <div class="match-v2-left">
+        <div class="match-v2-score ${scoreClass}"><span>${Math.round(m.compatibility_score)}%</span></div>
+        <div>
+          <div class="match-v2-title">
+            ${patient ? patient.nombre + ' ' + patient.apellido : '—'}
+            → ${implant ? implant.tipo_implante : '—'}${implant && implant.codigo_visible ? ' (' + implant.codigo_visible + ')' : ''}
+          </div>
+          <div class="match-v2-meta">
+            Cirugía: ${formatDate(req.fecha_estimada_cirugia)} · IPS: ${ips ? ips.nombre : '—'}
+          </div>
+        </div>
+      </div>
+      <div class="match-v2-right">
+        <span class="badge badge-blue">Requiere tu decisión</span>
+        <i class="ti ti-chevron-down match-v2-chevron"></i>
+      </div>
+    </div>
+    <div class="match-v2-detail">
+      <div class="compat-block" style="margin-top:0">
+        <div class="compat-title">Compatibilidad dimensional</div>
+        ${buildCompatRow('Alto',        req.alto_requerido,        m.compatibility_alto,         implant ? implant.alto  : null)}
+        ${buildCompatRow('Ancho',       req.ancho_requerido,       m.compatibility_ancho,        implant ? implant.ancho : null)}
+        ${buildCompatRow('Profundidad', req.profundidad_requerida, m.compatibility_profundidad)}
+        <div class="compat-summary">
+          <span class="compat-summary-label">Compatibilidad general</span>
+          <span class="badge ${m.compatibility_score >= 85 ? 'badge-green' : 'badge-amber'} badge-lg">
+            ${m.compatibility_score >= 85 ? 'Alta' : 'Media'} — ${Math.round(m.compatibility_score)}%
+          </span>
+        </div>
+      </div>
+      ${implant && implant.url_imagen ? `
+        <div style="margin-top:12px">
+          <div style="font-size:11px;color:var(--ink-faint);margin-bottom:6px;
+                      text-transform:uppercase;letter-spacing:.04em">Fotografía del implante</div>
+          <img src="${implant.url_imagen}" alt="Foto del implante"
+               style="max-width:220px;border-radius:8px;border:0.5px solid var(--border-mid)"/>
+        </div>` : `
+        <div style="margin-top:10px;font-size:11px;color:var(--ink-faint)">
+          <i class="ti ti-photo-off" style="font-size:13px;vertical-align:-1px"></i> Sin fotografía adjunta
+        </div>`}
+      <div class="match-footer" style="border-top:none;margin-top:16px;padding-top:0">
+        <span style="font-size:11.5px;color:var(--ink-faint)">Tolerancia aplicada: ±5 mm por dimensión</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn-success"
+                  onclick="event.stopPropagation(); aprobarMatchDoctorUI('${m.id}')">
+            <i class="ti ti-check" style="font-size:13px"></i> Aceptar implante
+          </button>
+          <button class="btn-danger"
+                  onclick="event.stopPropagation(); rechazarMatchDoctorUI('${m.id}')">
+            <i class="ti ti-x" style="font-size:13px"></i> Rechazar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+function renderMatchesPorAprobarDoctor(){
+  const container = document.getElementById('doctor-matches-list');
+  const emptyMsg  = document.getElementById('doctor-matches-empty');
+  const badge     = document.getElementById('doctor-matches-badge');
+  if(!container || !currentUser) return;
+
+  // Solo matches enviados que correspondan a solicitudes del doctor actual
+  const misSolIds = API.requests.listByDoctor(currentUser.id).map(r => r.id);
+  const mis = API.matches.listByStatus(['enviado']).filter(m => misSolIds.includes(m.request_id));
+
+  container.innerHTML = '';
+  const count = mis.length;
+  if(emptyMsg) emptyMsg.style.display = count === 0 ? 'block' : 'none';
+  if(badge){
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+  setText('sol-stat-match-pendiente', count);
+  mis.forEach(m => container.appendChild(buildMatchCardDoctor(m)));
+}
+
+function aprobarMatchDoctorUI(matchId){
+  API.matches.approveDoctor(matchId, currentUser.id);
+  refreshAll();
+}
+
+function rechazarMatchDoctorUI(matchId){
+  API.matches.rejectDoctor(matchId, currentUser.id, 'Rechazado por el médico');
+  refreshAll();
+}
+
+// ==========================================================================
 // Refresco maestro — se llama tras login y tras cualquier mutación
 // ==========================================================================
 function refreshAll(){
   if(!currentUser) return;
   renderMisSolicitudes();
+  renderMatchesPorAprobarDoctor();
   renderTodasSolicitudes();
   renderInventarioTejidos();
   renderPorVencerTejidos();

@@ -126,12 +126,51 @@
       </div>
 
       <div class="stats-row">
-        <div class="stat"><div class="stat-num" id="sol-stat-activas">—</div><div class="stat-lbl">Solicitudes activas</div></div>
-        <div class="stat info"><div class="stat-num" id="sol-stat-match-pendiente">—</div><div class="stat-lbl">Con match pendiente</div></div>
-        <div class="stat good"><div class="stat-num" id="sol-stat-asignadas">—</div><div class="stat-lbl">Asignadas / entregadas</div></div>
-        <div class="stat"><div class="stat-num" id="sol-stat-en-fila">—</div><div class="stat-lbl">En fila</div></div>
+        <div class="stat">
+          <div class="stat-num" id="sol-stat-activas">—</div>
+          <div class="stat-lbl">Solicitudes activas</div>
+        </div>
+        <div class="stat good">
+          <div class="stat-num" id="sol-stat-asignadas">—</div>
+          <div class="stat-lbl">Asignadas / entregadas</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num" id="sol-stat-en-fila">—</div>
+          <div class="stat-lbl">Pendientes</div>
+        </div>
+        <div class="stat info" id="stat-match-aprobar-card">
+          <div class="stat-num" id="sol-stat-match-pendiente" style="color:var(--blue-deep)">—</div>
+          <div class="stat-lbl" style="color:var(--blue-deep);font-weight:500">
+            <i class="ti ti-circles-relation" style="font-size:11px;vertical-align:-1px"></i>
+            Match por aprobar
+          </div>
+        </div>
       </div>
 
+      <!-- SECCIÓN: Match por aprobar -->
+      <div class="card" id="doctor-matches-section">
+        <div class="section-toolbar">
+          <div class="card-title" style="margin-bottom:0">
+            <span class="card-title-text">
+              <i class="ti ti-circles-relation"></i>Match por aprobar
+            </span>
+            <span id="doctor-matches-badge"
+                  style="display:none;background:var(--blue-deep);color:#fff;
+                         font-size:11px;padding:1px 8px;border-radius:10px;
+                         font-weight:500;margin-left:6px">0</span>
+          </div>
+          <span style="font-size:11.5px;color:var(--ink-faint)">
+            El equipo encontró un implante compatible. Revísalo y decide.
+          </span>
+        </div>
+        <div id="doctor-matches-list"></div>
+        <div id="doctor-matches-empty" class="table-empty" style="display:none">
+          <i class="ti ti-checks" style="font-size:24px;color:var(--teal);display:block;margin-bottom:6px"></i>
+          No tienes matches pendientes de revisión en este momento.
+        </div>
+      </div>
+
+      <!-- SECCIÓN: Mis solicitudes -->
       <div class="card">
         <div class="section-toolbar">
           <div class="card-title" style="margin-bottom:0"><span class="card-title-text"><i class="ti ti-list"></i>Mis solicitudes</span></div>
@@ -141,7 +180,6 @@
         <table class="table">
           <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Estado</th></tr></thead>
           <tbody id="mis-solicitudes-body"></tbody>
-          </tbody>
         </table>
         <div id="mis-solicitudes-empty" class="table-empty" style="display:none">Aún no tienes solicitudes registradas.</div>
         </div>
