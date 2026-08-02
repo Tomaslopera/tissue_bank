@@ -615,11 +615,15 @@ function renderDespachosPorEtiquetar(){
     const donor = API.compose.donor(implant.donor_id);
     const doctorName = API.compose.doctorDisplayName(req.doctor_id);
 
+    const codigoOrden = req.codigo_visible || '—';
+    const donorSexo = donor ? donor.sexo_biologico : '—';
+    const patientSexo = patient.sexo_biologico || '—';
+
     const card = document.createElement('div');
     card.className = 'dispatch-card';
     card.innerHTML = `
       <div class="dispatch-card-head">
-        <div class="dispatch-card-title">${implant.tipo_implante}${implant.codigo_visible ? ' — '+implant.codigo_visible : ''}</div>
+        <div class="dispatch-card-title">${implant.tipo_implante}${implant.codigo_visible ? ' — '+implant.codigo_visible : ''} <span style="font-family:monospace;font-size:11px;background:var(--blue-faint);color:var(--blue-deep);padding:1px 7px;border-radius:4px;margin-left:6px">${codigoOrden}</span></div>
         <span class="badge badge-amber">Por etiquetar</span>
       </div>
       <div class="dispatch-timeline">
@@ -628,19 +632,29 @@ function renderDespachosPorEtiquetar(){
         <div class="dispatch-tl-step"><div class="dispatch-tl-line"></div><div class="dispatch-tl-dot"></div><span class="dispatch-tl-label">En camino</span></div>
         <div class="dispatch-tl-step"><div class="dispatch-tl-line"></div><div class="dispatch-tl-dot"></div><span class="dispatch-tl-label">Entregado</span></div>
       </div>
-      <div class="dispatch-card-body">
-        <div class="etiq-grid">
-          <div class="etiq-field"><div class="etiq-label">Paciente</div><div class="etiq-value">${patient.nombre} ${patient.apellido}</div></div>
-          <div class="etiq-field"><div class="etiq-label">Identificación</div><div class="etiq-value">${patient.tipo_identificacion} ${patient.numero_identificacion}</div></div>
-          <div class="etiq-field"><div class="etiq-label">Médico solicitante</div><div class="etiq-value">${doctorName}</div></div>
-          <div class="etiq-field"><div class="etiq-label">IPS de destino</div><div class="etiq-value">${ips?ips.nombre:'—'}</div></div>
-          <div class="etiq-field"><div class="etiq-label">Tipo de tejido</div><div class="etiq-value">${implant.tipo_implante} · ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm</div></div>
-          <div class="etiq-field"><div class="etiq-label">Fecha de cirugía</div><div class="etiq-value">${formatDate(req.fecha_estimada_cirugia)}</div></div>
-          <div class="etiq-field"><div class="etiq-label">Donante</div><div class="etiq-value">${donor?donor.codigo_donante:'—'}</div></div>
+
+      <!-- ETIQUETA GENERADA AUTOMÁTICAMENTE -->
+      <div class="etiqueta-generada" id="etiqueta-${d.id}">
+        <div class="etiqueta-header">
+          <div class="etiqueta-brand">Tissue<span>Bank</span></div>
+          <div class="etiqueta-codigo">${codigoOrden}</div>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn-tag" onclick="etiquetarDespachoUI('${d.id}')"><i class="ti ti-tag" style="font-size:13px"></i> Marcar como etiquetado y en camino</button>
+        <div class="etiqueta-body">
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Paciente</span><span class="etiqueta-val">${patient.nombre} ${patient.apellido}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Identificación</span><span class="etiqueta-val">${patient.tipo_identificacion} ${patient.numero_identificacion}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Sexo paciente</span><span class="etiqueta-val">${patientSexo === 'M' ? 'Masculino' : patientSexo === 'F' ? 'Femenino' : '—'}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Tejido</span><span class="etiqueta-val">${implant.tipo_implante} · ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Donante</span><span class="etiqueta-val">${donor ? donor.codigo_donante : '—'} · Sexo: ${donorSexo === 'M' ? 'M' : donorSexo === 'F' ? 'F' : '—'}</span></div>
+          <div class="etiqueta-row etiqueta-ips"><span class="etiqueta-lbl">IPS destino</span><span class="etiqueta-val">${ips ? ips.nombre : '—'}${ips && ips.ciudad ? ', '+ips.ciudad : ''}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Médico</span><span class="etiqueta-val">${doctorName}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Cirugía estimada</span><span class="etiqueta-val">${formatDate(req.fecha_estimada_cirugia)}</span></div>
         </div>
+        <div class="etiqueta-footer">Generado automáticamente por TissueBank · ${new Date().toLocaleDateString('es-CO')}</div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn-outline" onclick="imprimirEtiqueta('${d.id}')"><i class="ti ti-printer" style="font-size:13px"></i> Imprimir etiqueta</button>
+        <button class="btn-tag" onclick="etiquetarDespachoUI('${d.id}')"><i class="ti ti-truck-delivery" style="font-size:13px"></i> Marcar como en camino</button>
       </div>
     `;
     container.appendChild(card);
@@ -713,9 +727,11 @@ function renderDespachosEntregados(){
     const ips = API.compose.ips(d.ips_id);
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td><span style="font-family:monospace;font-size:11px;background:var(--blue-faint);color:var(--blue-deep);padding:1px 7px;border-radius:4px">${req.codigo_visible || '—'}</span></td>
       <td>${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''}</td>
       <td>${patient.nombre} ${patient.apellido}</td>
       <td>${ips?ips.nombre:'—'}</td>
+      <td>${formatDate(req.fecha_estimada_cirugia)}</td>
       <td><span class="badge badge-green">Entregado</span></td>
     `;
     tbody.appendChild(tr);
@@ -727,6 +743,30 @@ function renderDespachosEntregados(){
 
 function etiquetarDespachoUI(dispatchId){ API.dispatches.label(dispatchId); refreshAll(); }
 function entregarDespachoUI(dispatchId){ API.dispatches.deliver(dispatchId); refreshAll(); }
+
+function imprimirEtiqueta(dispatchId){
+  const etiquetaEl = document.getElementById('etiqueta-' + dispatchId);
+  if(!etiquetaEl){ alert('No se encontró la etiqueta.'); return; }
+  const printWin = window.open('', '_blank', 'width=400,height=600');
+  printWin.document.write(`
+    <!DOCTYPE html><html><head><meta charset="UTF-8"/>
+    <title>Etiqueta TissueBank</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;padding:16px;background:#fff;color:#111}
+      .etiqueta-generada{border:2px solid #1a3a6b;border-radius:10px;padding:14px;max-width:340px;margin:0 auto}
+      .etiqueta-header{display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #1a3a6b;padding-bottom:8px;margin-bottom:10px}
+      .etiqueta-brand{font-size:18px;font-weight:700;color:#1a3a6b}.etiqueta-brand span{color:#1D9E75}
+      .etiqueta-codigo{font-family:monospace;font-size:13px;background:#E6F1FB;color:#0C447C;padding:2px 8px;border-radius:4px}
+      .etiqueta-row{display:flex;gap:8px;margin-bottom:6px;font-size:12px}
+      .etiqueta-lbl{color:#888;width:110px;flex-shrink:0;font-size:11px}
+      .etiqueta-val{font-weight:500;color:#111}
+      .etiqueta-ips .etiqueta-val{font-weight:700;font-size:13px}
+      .etiqueta-footer{margin-top:10px;padding-top:8px;border-top:1px solid #e0e0e0;font-size:10px;color:#aaa;text-align:center}
+    </style></head><body>` + etiquetaEl.outerHTML + `</body></html>`);
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(()=>{ printWin.print(); printWin.close(); }, 300);
+}
 
 // ==========================================================================
 // Panel Doctores (admin) — crear / editar / activar / desactivar cuentas
@@ -953,6 +993,8 @@ function enviarSolicitud(){
     });
   }
 
+  const sexoNoImportante = document.getElementById('sol-sexo-no-importante')?.checked || false;
+
   const patient = API.patients.create({
     tipo_identificacion: document.getElementById('sol-tipo-identificacion').value,
     nombre: document.getElementById('sol-nombre').value.trim(),
@@ -960,6 +1002,7 @@ function enviarSolicitud(){
     fecha_nacimiento: document.getElementById('sol-fecha-nac').value || null,
     edad: Number(document.getElementById('sol-edad').value) || null,
     nacionalidad: document.getElementById('sol-nacionalidad').value.trim(),
+    sexo_biologico: document.getElementById('sol-sexo-biologico')?.value || null,
   });
 
   API.requests.create({
@@ -973,6 +1016,7 @@ function enviarSolicitud(){
     profundidad_requerida: Number(document.getElementById('sol-prof').value),
     fecha_estimada_cirugia: document.getElementById('sol-fecha-cirugia').value,
     diagnostico: document.getElementById('sol-diagnostico').value.trim(),
+    sexo_importante: !sexoNoImportante,
   });
 
   const banner = document.getElementById('sol-success-banner');

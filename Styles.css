@@ -919,3 +919,61 @@ body[data-role="admin"] .nav-doctor-only{
 .dispatch-tl-step.done .dispatch-tl-line{background:var(--teal)}
 
 .dispatch-card-body{padding:16px 18px}
+/* ==========================================================================
+   Etiqueta generada automáticamente — Panel etiquetado
+   ========================================================================== */
+.etiqueta-generada {
+  border: 2px solid var(--navy);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: #fff;
+}
+.etiqueta-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid var(--navy);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.etiqueta-brand { font-size: 17px; font-weight: 700; color: var(--navy); }
+.etiqueta-brand span { color: var(--teal); }
+.etiqueta-codigo {
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--blue-faint);
+  color: var(--blue-deep);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.etiqueta-body { margin-bottom: 8px; }
+.etiqueta-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  align-items: baseline;
+}
+.etiqueta-lbl {
+  color: var(--ink-faint);
+  width: 120px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.etiqueta-val { font-weight: 500; color: var(--ink-dark); }
+.etiqueta-ips .etiqueta-val { font-weight: 700; font-size: 13px; color: var(--navy); }
+.etiqueta-footer {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 0.5px solid var(--border-mid);
+  font-size: 10px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+/* Stat card con borde de info para match por aprobar */
+.stat.info {
+  border: 1.5px solid var(--blue-deep);
+  background: var(--blue-faint);
+}
