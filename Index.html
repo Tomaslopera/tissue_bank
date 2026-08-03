@@ -88,15 +88,15 @@
     <div class="sidebar-section-label nav-admin-only">Flujo de match</div>
     <button class="nav-btn nav-admin-only" data-panel="recomendaciones" aria-current="false" onclick="showPanel('recomendaciones',this)">
       <i class="ti ti-circles-relation"></i><span class="nav-btn-text">Recomendaciones</span>
-      <span class="nav-badge">2</span>
+      <span class="nav-badge" id="nav-badge-recomendaciones" style="display:none">0</span>
     </button>
     <button class="nav-btn nav-admin-only" data-panel="asignaciones" aria-current="false" onclick="showPanel('asignaciones',this)">
       <i class="ti ti-clipboard-check"></i><span class="nav-btn-text">Asignaciones</span>
-      <span class="nav-badge">1</span>
+      <span class="nav-badge" id="nav-badge-asignaciones" style="display:none">0</span>
     </button>
     <button class="nav-btn nav-admin-only" data-panel="etiquetado" aria-current="false" onclick="showPanel('etiquetado',this)">
       <i class="ti ti-tag"></i><span class="nav-btn-text">Etiquetado</span>
-      <span class="nav-badge">1</span>
+      <span class="nav-badge" id="nav-badge-etiquetado" style="display:none">0</span>
     </button>
 
     <div class="sidebar-section-label nav-admin-only">Administración</div>
@@ -176,12 +176,34 @@
           <div class="card-title" style="margin-bottom:0"><span class="card-title-text"><i class="ti ti-list"></i>Mis solicitudes</span></div>
           <button class="btn-primary" onclick="prepararModalNuevaSolicitud(); openModal('modal-nueva-solicitud')"><i class="ti ti-plus" style="font-size:13px"></i> Nueva solicitud</button>
         </div>
-        <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Estado</th></tr></thead>
-          <tbody id="mis-solicitudes-body"></tbody>
-        </table>
-        <div id="mis-solicitudes-empty" class="table-empty" style="display:none">Aún no tienes solicitudes registradas.</div>
+
+        <div class="panel-tabs" id="tab-mis-sol">
+          <button class="panel-tab active" onclick="showTab('tab-mis-sol','activas',this)">
+            <i class="ti ti-list-details"></i> Activas <span class="panel-tab-count" id="mis-sol-tab-count-activas">0</span>
+          </button>
+          <button class="panel-tab" onclick="showTab('tab-mis-sol','historial',this)">
+            <i class="ti ti-history"></i> Historial
+          </button>
+        </div>
+
+        <div class="tab-pane active" id="tab-mis-sol-activas">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Estado</th></tr></thead>
+            <tbody id="mis-solicitudes-body"></tbody>
+          </table>
+          <div id="mis-solicitudes-empty" class="table-empty" style="display:none">No tienes solicitudes activas en este momento.</div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-mis-sol-historial">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Estado</th></tr></thead>
+            <tbody id="mis-solicitudes-historial-body"></tbody>
+          </table>
+          <div id="mis-solicitudes-historial-empty" class="table-empty" style="display:none">Aún no tienes solicitudes registradas.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -249,12 +271,35 @@
         <div class="stat good"><div class="stat-num" id="adm-stat-resueltas">—</div><div class="stat-lbl">Asignadas / entregadas</div></div>
       </div>
       <div class="card">
-        <div class="card-title"><span class="card-title-text"><i class="ti ti-list-details"></i>Todas las solicitudes activas</span></div>
-        <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Doctor</th><th>Estado</th></tr></thead>
-          <tbody id="todas-solicitudes-body"></tbody>
-        </table>
+        <div class="card-title"><span class="card-title-text"><i class="ti ti-list-details"></i>Solicitudes</span></div>
+
+        <div class="panel-tabs" id="tab-todas-sol">
+          <button class="panel-tab active" onclick="showTab('tab-todas-sol','activas',this)">
+            <i class="ti ti-list-details"></i> Activas <span class="panel-tab-count" id="todas-sol-tab-count-activas">0</span>
+          </button>
+          <button class="panel-tab" onclick="showTab('tab-todas-sol','historial',this)">
+            <i class="ti ti-history"></i> Historial
+          </button>
+        </div>
+
+        <div class="tab-pane active" id="tab-todas-sol-activas">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Doctor</th><th>Estado</th></tr></thead>
+            <tbody id="todas-solicitudes-body"></tbody>
+          </table>
+          <div id="todas-solicitudes-empty" class="table-empty" style="display:none">No hay solicitudes activas en este momento.</div>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-todas-sol-historial">
+          <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Paciente</th><th>Identificación</th><th>Tejido</th><th>IPS</th><th>Cirugía</th><th>Doctor</th><th>Estado</th></tr></thead>
+            <tbody id="todas-solicitudes-historial-body"></tbody>
+          </table>
+          <div id="todas-solicitudes-historial-empty" class="table-empty" style="display:none">Aún no hay solicitudes registradas.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -520,7 +565,7 @@
     <div class="modal-body">
 
       <div class="notif-banner" style="display:flex;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="sol-form-error">
-        <i class="ti ti-alert-triangle" style="font-size:14px"></i> Completa los campos marcados para poder enviar la solicitud.
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="sol-form-error-msg">Completa los campos marcados para poder enviar la solicitud.</span>
       </div>
       <div class="notif-banner" style="display:none;background:var(--teal-soft);border-color:#B7E4CF;color:var(--teal-deep)" id="sol-success-banner">
         <i class="ti ti-circle-check" style="font-size:14px"></i> Solicitud enviada correctamente. Se notificará cuando exista un match compatible.
@@ -551,6 +596,13 @@
           <span class="field-error" id="sol-apellido-error">Este campo es obligatorio</span>
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Número de identificación <span class="req">*</span></label>
+          <input class="form-input" id="sol-numero-identificacion" value="" placeholder="Ej: 1037642891"/>
+          <span class="field-error" id="sol-numero-identificacion-error">Este campo es obligatorio</span>
+        </div>
+      </div>
       <div class="form-row three">
         <div class="form-group">
           <label class="form-label">Fecha de nacimiento</label>
@@ -573,6 +625,7 @@
             <option value="M">Masculino</option>
             <option value="F">Femenino</option>
           </select>
+          <span class="field-error" id="sol-sexo-biologico-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group" style="justify-content:flex-end;padding-bottom:4px">
           <label class="form-label" style="margin-bottom:8px">Compatibilidad de sexo en el match</label>
@@ -673,6 +726,13 @@
     </div>
     <div class="modal-body">
 
+      <div class="notif-banner" style="display:none;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="donante-form-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="donante-form-error-msg">No se pudo guardar el donante. Intenta de nuevo.</span>
+      </div>
+      <div class="notif-banner" style="display:none;background:var(--teal-soft);border-color:#B7E4CF;color:var(--teal-deep)" id="donante-success-banner">
+        <i class="ti ti-circle-check" style="font-size:14px"></i> Donante e implantes guardados correctamente.
+      </div>
+
       <div class="section-label"><i class="ti ti-1-circle"></i>Datos del donante</div>
       <div class="form-row three">
         <div class="form-group">
@@ -697,6 +757,15 @@
           <label class="form-label">Fecha de vencimiento</label>
           <input class="form-input" type="date" id="donante-fecha-vencimiento" value=""/>
         </div>
+        <div class="form-group">
+          <label class="form-label">Sexo biológico del donante <span class="req">*</span></label>
+          <select class="form-input" id="donante-sexo-biologico">
+            <option value="">Seleccionar...</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+          </select>
+          <span class="field-error" id="donante-sexo-biologico-error">Este campo es obligatorio</span>
+        </div>
       </div>
       <div class="warn-note">
         <i class="ti ti-clock" style="font-size:14px"></i>
@@ -716,6 +785,13 @@
       <div class="new-implant-box">
         <div class="new-implant-label" id="implant-form-label"><i class="ti ti-plus" style="color:var(--teal)"></i> Agregar nuevo implante</div>
         <input type="hidden" id="implant-edit-index" value=""/>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Código del implante <span class="req">*</span></label>
+            <input class="form-input" id="implant-codigo-visible" placeholder="Ej: TEJ-2026-013"/>
+            <span class="field-error" id="implant-codigo-visible-error">Este campo es obligatorio</span>
+          </div>
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Parte del cuerpo <span class="req">*</span></label>
@@ -847,7 +923,250 @@
       </div>
     </div>
     <div class="modal-foot">
+      <input type="hidden" id="det-implante-id" value=""/>
       <button class="btn-outline" onclick="closeModal('modal-detalle-implante')">Cerrar</button>
+      <button class="btn-primary" onclick="closeModal('modal-detalle-implante'); abrirEditarImplanteUI(document.getElementById('det-implante-id').value)"><i class="ti ti-pencil" style="font-size:13px"></i> Editar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Editar implante (Panel Tejidos)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-editar-implante">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Editar implante</div>
+        <div class="modal-head-sub">Los cambios se guardan directo en el inventario</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-editar-implante')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-implant-id" value=""/>
+      <div class="notif-banner" style="display:none;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="edit-implant-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="edit-implant-error-msg">No se pudo guardar el implante.</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Código del implante <span class="req">*</span></label>
+        <input class="form-input" id="edit-implant-codigo-visible" placeholder="Ej: TEJ-2026-013"/>
+        <span class="field-error" id="edit-implant-codigo-visible-error">Este campo es obligatorio</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Parte del cuerpo <span class="req">*</span></label>
+          <select class="form-input" id="edit-implant-parte-cuerpo">
+            <option value="">Seleccionar...</option>
+            <option>Rodilla derecha</option>
+            <option>Rodilla izquierda</option>
+            <option>Cadera derecha</option>
+            <option>Cadera izquierda</option>
+            <option>Talo derecho</option>
+            <option>Talo izquierdo</option>
+            <option>Columna</option>
+            <option>Espalda</option>
+            <option>Otro</option>
+          </select>
+          <span class="field-error" id="edit-implant-parte-cuerpo-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de implante <span class="req">*</span></label>
+          <select class="form-input" id="edit-implant-tipo-implante">
+            <option value="">Seleccionar...</option>
+            <option>Cóndilo</option>
+            <option>Patela</option>
+            <option>Plato tibial</option>
+            <option>Fémur</option>
+            <option>Talo</option>
+            <option>Menisco medial</option>
+            <option>Menisco lateral</option>
+            <option>Piel</option>
+            <option>Hueso</option>
+            <option>Otro</option>
+          </select>
+          <span class="field-error" id="edit-implant-tipo-implante-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Alto (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="edit-implant-alto"/>
+          <span class="field-error" id="edit-implant-alto-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="edit-implant-ancho"/>
+          <span class="field-error" id="edit-implant-ancho-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-input" id="edit-implant-estado">
+            <option value="disponible">Disponible</option>
+            <option value="reservado">Reservado</option>
+            <option value="asignado">Asignado</option>
+            <option value="contraindicado">Contraindicado</option>
+            <option value="vencido">Vencido</option>
+            <option value="despachado">Despachado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas adicionales</label>
+        <input class="form-input" id="edit-implant-notas" placeholder="Ej: IPS no autorizó, no se operó el hato..."/>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-editar-implante')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarEdicionImplanteUI()"><i class="ti ti-check" style="font-size:13px"></i> Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Editar donante (Panel Tejidos)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-editar-donante">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Editar donante</div>
+        <div class="modal-head-sub">La fecha de vencimiento aplica a todos los implantes de este donante</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-editar-donante')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-donante-id" value=""/>
+      <div class="notif-banner" style="display:none;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="edit-donante-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="edit-donante-error-msg">No se pudo guardar el donante.</span>
+      </div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Código donante (INML)</label>
+          <input class="form-input" id="edit-donante-codigo"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de extracción</label>
+          <input class="form-input" type="date" id="edit-donante-fecha-extraccion"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de procesamiento</label>
+          <input class="form-input" type="date" id="edit-donante-fecha-procedimiento"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">2° cambio</label>
+          <input class="form-input" type="date" id="edit-donante-fecha-segundo-cambio"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de vencimiento</label>
+          <input class="form-input" type="date" id="edit-donante-fecha-vencimiento"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sexo biológico</label>
+          <select class="form-input" id="edit-donante-sexo-biologico">
+            <option value="">Seleccionar...</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-editar-donante')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarEdicionDonanteUI()"><i class="ti ti-check" style="font-size:13px"></i> Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================================
+     MODAL: Agregar implante a un donante existente (Panel Tejidos)
+     ====================================================================== -->
+<div class="modal-overlay" id="modal-agregar-implante">
+  <div class="modal-box modal-narrow">
+    <div class="modal-head">
+      <div>
+        <div class="modal-head-title">Agregar implante</div>
+        <div class="modal-head-sub">Donante <span id="agregar-implante-donor-codigo" class="code-badge" style="vertical-align:middle"></span></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-agregar-implante')" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="agregar-implante-donor-id" value=""/>
+      <div class="notif-banner" style="display:none;background:var(--rust-soft);border-color:#E2B3A5;color:var(--rust-deep)" id="agregar-implante-error">
+        <i class="ti ti-alert-triangle" style="font-size:14px"></i> <span id="agregar-implante-error-msg">No se pudo agregar el implante.</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Código del implante <span class="req">*</span></label>
+        <input class="form-input" id="agregar-implante-codigo-visible" placeholder="Ej: TEJ-2026-013"/>
+        <span class="field-error" id="agregar-implante-codigo-visible-error">Este campo es obligatorio</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Parte del cuerpo <span class="req">*</span></label>
+          <select class="form-input" id="agregar-implante-parte-cuerpo">
+            <option value="">Seleccionar...</option>
+            <option>Rodilla derecha</option>
+            <option>Rodilla izquierda</option>
+            <option>Cadera derecha</option>
+            <option>Cadera izquierda</option>
+            <option>Talo derecho</option>
+            <option>Talo izquierdo</option>
+            <option>Columna</option>
+            <option>Espalda</option>
+            <option>Otro</option>
+          </select>
+          <span class="field-error" id="agregar-implante-parte-cuerpo-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de implante <span class="req">*</span></label>
+          <select class="form-input" id="agregar-implante-tipo-implante">
+            <option value="">Seleccionar...</option>
+            <option>Cóndilo</option>
+            <option>Patela</option>
+            <option>Plato tibial</option>
+            <option>Fémur</option>
+            <option>Talo</option>
+            <option>Menisco medial</option>
+            <option>Menisco lateral</option>
+            <option>Piel</option>
+            <option>Hueso</option>
+            <option>Otro</option>
+          </select>
+          <span class="field-error" id="agregar-implante-tipo-implante-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row three">
+        <div class="form-group">
+          <label class="form-label">Alto (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="agregar-implante-alto"/>
+          <span class="field-error" id="agregar-implante-alto-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="agregar-implante-ancho"/>
+          <span class="field-error" id="agregar-implante-ancho-error">Este campo es obligatorio</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Estado</label>
+          <select class="form-input" id="agregar-implante-estado">
+            <option value="disponible">Disponible</option>
+            <option value="reservado">Reservado</option>
+            <option value="asignado">Asignado</option>
+            <option value="contraindicado">Contraindicado</option>
+            <option value="vencido">Vencido</option>
+            <option value="despachado">Despachado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas adicionales</label>
+        <input class="form-input" id="agregar-implante-notas" placeholder="Ej: IPS no autorizó, no se operó el hato..."/>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-outline" onclick="closeModal('modal-agregar-implante')">Cancelar</button>
+      <button class="btn-primary" onclick="guardarImplanteAgregadoUI()"><i class="ti ti-plus" style="font-size:13px"></i> Agregar implante</button>
     </div>
   </div>
 </div>

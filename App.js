@@ -12,6 +12,12 @@ let currentUser = null;
 // Helpers de formato
 // ==========================================================================
 function setText(id, value){ const el = document.getElementById(id); if(el) el.textContent = value; }
+function setBadge(id, count){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = count;
+  el.style.display = count > 0 ? '' : 'none';
+}
 
 function formatDate(dateStr){
   if(!dateStr) return '—';
@@ -55,6 +61,20 @@ const STATUS_LABELS = {
   en_camino:        { label: 'En camino',        badge: 'badge-blue'   },
   entregada:        { label: 'Entregada',        badge: 'badge-green'  },
 };
+
+// Tarjeta de reemplazo cuando un registro puntual no se puede resolver
+// (la API devuelve error para ese id específico — dato roto en el
+// servidor). Evita que un solo registro dañado tumbe el panel completo.
+function buildBrokenCard(id, error){
+  console.warn('No se pudo cargar el registro ' + id + ':', error && error.message);
+  const card = document.createElement('div');
+  card.className = 'match-card';
+  card.innerHTML = `<div style="padding:14px;color:var(--ink-faint);font-size:12px;display:flex;align-items:center;gap:8px">
+    <i class="ti ti-alert-triangle" style="color:var(--rust);font-size:16px"></i>
+    No se pudo cargar este registro (${id}). El servidor devolvió un error al consultarlo.
+  </div>`;
+  return card;
+}
 
 // ==========================================================================
 // Navegación entre paneles
@@ -177,23 +197,28 @@ function cerrarSesion(){
 async function renderMisSolicitudes(){
   const tbody = document.getElementById('mis-solicitudes-body');
   const emptyMsg = document.getElementById('mis-solicitudes-empty');
+  const histTbody = document.getElementById('mis-solicitudes-historial-body');
+  const histEmptyMsg = document.getElementById('mis-solicitudes-historial-empty');
   if(!tbody || !currentUser) return;
 
   const reqs = await API.requests.listByDoctor(currentUser.id);
   tbody.innerHTML = '';
-  if(emptyMsg) emptyMsg.style.display = reqs.length === 0 ? 'block' : 'none';
+  if(histTbody) histTbody.innerHTML = '';
 
-  const rows = await Promise.all(reqs.map(async r=>{
-    const [p, ips, status] = await Promise.all([
-      API.compose.patient(r.patient_id),
-      API.compose.ips(r.ips_id),
-      API.requests.getStatus(r.id),
-    ]);
+  const resolved = await Promise.all(reqs.map(async r=>{
+    let p, ips, status;
+    try{
+      [p, ips, status] = await Promise.all([
+        API.compose.patient(r.patient_id),
+        API.compose.ips(r.ips_id),
+        API.requests.getStatus(r.id),
+      ]);
+    }catch(e){
+      console.warn('No se pudo cargar toda la información de la solicitud ' + r.id + ':', e.message);
+      p = null; ips = null; status = null;
+    }
     const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.en_fila;
-    const tr = document.createElement('tr');
-    tr.className = 'row-clickable';
-    tr.onclick = ()=>abrirDetalleSolicitud(r.id);
-    tr.innerHTML = `
+    const html = `
       <td>${p ? p.nombre+' '+p.apellido : '—'}</td>
       <td>${p ? p.tipo_identificacion+' '+p.numero_identificacion : '—'}</td>
       <td>${r.tejido_solicitado} ${r.alto_requerido}×${r.ancho_requerido}×${r.profundidad_requerida}</td>
@@ -201,14 +226,32 @@ async function renderMisSolicitudes(){
       <td>${formatDate(r.fecha_estimada_cirugia)}</td>
       <td><span class="badge ${statusInfo.badge}">${statusInfo.label}</span></td>
     `;
-    return { tr, status };
+    return { r, status, html };
   }));
-  rows.forEach(({tr})=> tbody.appendChild(tr));
 
-  setText('sol-stat-activas', reqs.length);
-  setText('sol-stat-en-fila', rows.filter(x=>x.status==='en_fila').length);
-  setText('sol-stat-match-pendiente', rows.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
-  setText('sol-stat-asignadas', rows.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
+  // "Activas": todo lo que no haya llegado a entregada. "Historial": el
+  // registro completo, sin filtrar — la misma solicitud puede aparecer en
+  // ambas pestañas mientras sigue en curso.
+  const activas = resolved.filter(x=> x.status !== 'entregada');
+
+  const buildRow = ({r, html})=>{
+    const tr = document.createElement('tr');
+    tr.className = 'row-clickable';
+    tr.onclick = ()=>abrirDetalleSolicitud(r.id);
+    tr.innerHTML = html;
+    return tr;
+  };
+  activas.forEach(x=> tbody.appendChild(buildRow(x)));
+  if(histTbody) resolved.forEach(x=> histTbody.appendChild(buildRow(x)));
+
+  if(emptyMsg) emptyMsg.style.display = activas.length === 0 ? 'block' : 'none';
+  if(histEmptyMsg) histEmptyMsg.style.display = resolved.length === 0 ? 'block' : 'none';
+  setText('mis-sol-tab-count-activas', activas.length);
+
+  setText('sol-stat-activas', activas.length);
+  setText('sol-stat-en-fila', resolved.filter(x=>x.status==='en_fila').length);
+  setText('sol-stat-match-pendiente', resolved.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
+  setText('sol-stat-asignadas', resolved.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
 }
 
 // ==========================================================================
@@ -216,23 +259,33 @@ async function renderMisSolicitudes(){
 // ==========================================================================
 async function renderTodasSolicitudes(){
   const tbody = document.getElementById('todas-solicitudes-body');
+  const emptyMsg = document.getElementById('todas-solicitudes-empty');
+  const histTbody = document.getElementById('todas-solicitudes-historial-body');
+  const histEmptyMsg = document.getElementById('todas-solicitudes-historial-empty');
   if(!tbody) return;
 
   const reqs = await API.requests.list();
   tbody.innerHTML = '';
+  if(histTbody) histTbody.innerHTML = '';
 
-  const rows = await Promise.all(reqs.map(async r=>{
-    const [p, ips, doctorName, status] = await Promise.all([
-      API.compose.patient(r.patient_id),
-      API.compose.ips(r.ips_id),
-      API.compose.doctorDisplayName(r.doctor_id),
-      API.requests.getStatus(r.id),
-    ]);
+  const resolved = await Promise.all(reqs.map(async r=>{
+    let p, ips, doctorName, status;
+    try{
+      [p, ips, doctorName, status] = await Promise.all([
+        API.compose.patient(r.patient_id),
+        API.compose.ips(r.ips_id),
+        API.compose.doctorDisplayName(r.doctor_id),
+        API.requests.getStatus(r.id),
+      ]);
+    }catch(e){
+      // Una solicitud con datos rotos (paciente/IPS/doctor inexistente, etc.)
+      // no debe tumbar la tabla completa — se pinta igual con lo que falte
+      // en blanco, en vez de dejar el panel entero vacío por un solo caso.
+      console.warn('No se pudo cargar toda la información de la solicitud ' + r.id + ':', e.message);
+      p = null; ips = null; doctorName = '—'; status = null;
+    }
     const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.en_fila;
-    const tr = document.createElement('tr');
-    tr.className = 'row-clickable';
-    tr.onclick = ()=>abrirDetalleSolicitud(r.id);
-    tr.innerHTML = `
+    const html = `
       <td>${p ? p.nombre+' '+p.apellido : '—'}</td>
       <td>${p ? p.tipo_identificacion+' '+p.numero_identificacion : '—'}</td>
       <td>${r.tejido_solicitado} ${r.alto_requerido}×${r.ancho_requerido}×${r.profundidad_requerida}</td>
@@ -241,14 +294,31 @@ async function renderTodasSolicitudes(){
       <td>${doctorName}</td>
       <td><span class="badge ${statusInfo.badge}">${statusInfo.label}</span></td>
     `;
-    return { tr, status };
+    return { r, status, html };
   }));
-  rows.forEach(({tr})=> tbody.appendChild(tr));
+
+  // "Activas": todo lo que no haya llegado a entregada. "Historial": el
+  // registro completo, sin filtrar.
+  const activas = resolved.filter(x=> x.status !== 'entregada');
+
+  const buildRow = ({r, html})=>{
+    const tr = document.createElement('tr');
+    tr.className = 'row-clickable';
+    tr.onclick = ()=>abrirDetalleSolicitud(r.id);
+    tr.innerHTML = html;
+    return tr;
+  };
+  activas.forEach(x=> tbody.appendChild(buildRow(x)));
+  if(histTbody) resolved.forEach(x=> histTbody.appendChild(buildRow(x)));
+
+  if(emptyMsg) emptyMsg.style.display = activas.length === 0 ? 'block' : 'none';
+  if(histEmptyMsg) histEmptyMsg.style.display = resolved.length === 0 ? 'block' : 'none';
+  setText('todas-sol-tab-count-activas', activas.length);
 
   setText('adm-stat-total', reqs.length);
-  setText('adm-stat-en-fila', rows.filter(x=>x.status==='en_fila').length);
-  setText('adm-stat-en-proceso', rows.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
-  setText('adm-stat-resueltas', rows.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
+  setText('adm-stat-en-fila', resolved.filter(x=>x.status==='en_fila').length);
+  setText('adm-stat-en-proceso', resolved.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
+  setText('adm-stat-resueltas', resolved.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
 }
 
 // ==========================================================================
@@ -300,6 +370,8 @@ async function renderInventarioTejidos(){
         <div class="donor-group-meta">
           <span class="donor-meta-item"><i class="ti ti-calendar-event"></i> Extraído ${formatDate(donor.fecha_extraccion)}</span>
           <span class="donor-meta-item ${expiring?'expiring':''}"><i class="ti ${expiring?'ti-alert-triangle':'ti-clock'}"></i> Vence ${formatDate(donor.fecha_vencimiento)}</span>
+          <button type="button" class="implant-action-btn" title="Editar donante" onclick="abrirEditarDonanteUI('${donor.id}')"><i class="ti ti-pencil"></i></button>
+          <button type="button" class="implant-action-btn" title="Agregar implante a este donante" onclick="abrirAgregarImplanteUI('${donor.id}')"><i class="ti ti-plus"></i></button>
         </div>
       </div>
       <div class="donor-group-body"></div>
@@ -462,12 +534,13 @@ async function renderMatchesPendientes(){
   ]);
   container.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = matches.length===0 ? 'block' : 'none';
-  const cards = await Promise.all(matches.map(buildMatchCardPendiente));
+  const cards = await Promise.all(matches.map(m=> buildMatchCardPendiente(m).catch(e=> buildBrokenCard(m.id, e))));
   cards.forEach(c=> container.appendChild(c));
 
   setText('reco-pendientes-count', matches.length);
   setText('reco-stat-por-enviar', matches.length);
   setText('reco-stat-detectados', allMatches.length);
+  setBadge('nav-badge-recomendaciones', matches.length);
 }
 
 async function buildMatchCardEsperando(m){
@@ -518,7 +591,7 @@ async function renderMatchesEsperando(){
   const matches = await API.matches.listByStatus(['enviado']);
   container.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = matches.length===0 ? 'block' : 'none';
-  const cards = await Promise.all(matches.map(buildMatchCardEsperando));
+  const cards = await Promise.all(matches.map(m=> buildMatchCardEsperando(m).catch(e=> buildBrokenCard(m.id, e))));
   cards.forEach(c=> container.appendChild(c));
 
   setText('reco-esperando-count', matches.length);
@@ -532,16 +605,22 @@ async function renderMatchesHistorial(){
   const matches = await API.matches.listByStatus(['aprobado_doctor','aprobado_admin','rechazado_doctor','rechazado_admin']);
   tbody.innerHTML = '';
   const rows = await Promise.all(matches.map(async m=>{
-    const req = await API.requests.getById(m.request_id);
-    const [patient, implant] = await Promise.all([
-      API.compose.patient(req.patient_id),
-      API.compose.implant(m.implant_id),
-    ]);
+    let patient, implant;
+    try{
+      const req = await API.requests.getById(m.request_id);
+      [patient, implant] = await Promise.all([
+        API.compose.patient(req.patient_id),
+        API.compose.implant(m.implant_id),
+      ]);
+    }catch(e){
+      console.warn('No se pudo cargar toda la información del match ' + m.id + ':', e.message);
+      patient = null; implant = null;
+    }
     const aprobado = ['aprobado_doctor','aprobado_admin'].includes(m.status);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${patient.nombre} ${patient.apellido}</td>
-      <td>${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''}</td>
+      <td>${patient ? patient.nombre+' '+patient.apellido : '—'}</td>
+      <td>${implant ? implant.tipo_implante+(implant.codigo_visible ? ' '+implant.codigo_visible : '') : '—'}</td>
       <td>${Math.round(m.compatibility_score)}%</td>
       <td><span class="badge ${aprobado?'badge-green':'badge-red'}">${aprobado?'Aprobado':'Rechazado'}</span></td>
       <td>${m.sent_at ? formatDate(m.sent_at) : '—'}</td>
@@ -570,41 +649,46 @@ async function renderAsignacionesPendientes(){
   if(doneMsg) doneMsg.style.display = pendientes.length===0 ? 'block' : 'none';
 
   const cards = await Promise.all(pendientes.map(async a=>{
-    const m = await API.matches.getById(a.match_id);
-    const req = await API.requests.getById(m.request_id);
-    const [patient, implant, ips, doctorName] = await Promise.all([
-      API.compose.patient(req.patient_id),
-      API.compose.implant(m.implant_id),
-      API.compose.ips(req.ips_id),
-      API.compose.doctorDisplayName(req.doctor_id),
-    ]);
+    try{
+      const m = await API.matches.getById(a.match_id);
+      const req = await API.requests.getById(m.request_id);
+      const [patient, implant, ips, doctorName] = await Promise.all([
+        API.compose.patient(req.patient_id),
+        API.compose.implant(m.implant_id),
+        API.compose.ips(req.ips_id),
+        API.compose.doctorDisplayName(req.doctor_id),
+      ]);
 
-    const card = document.createElement('div');
-    card.className = 'match-card';
-    card.innerHTML = `
-      <div class="match-top">
-        <div class="match-info">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
-            <div class="match-title" style="margin-bottom:0">${patient.nombre} ${patient.apellido} — ${req.procedimiento_quirurgico || req.tejido_solicitado}</div>
+      const card = document.createElement('div');
+      card.className = 'match-card';
+      card.innerHTML = `
+        <div class="match-top">
+          <div class="match-info">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+              <div class="match-title" style="margin-bottom:0">${patient.nombre} ${patient.apellido} — ${req.procedimiento_quirurgico || req.tejido_solicitado}</div>
+            </div>
+            <div class="match-meta">${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''} ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm · Compatibilidad: ${Math.round(m.compatibility_score)}% · ${doctorName} aprobó</div>
+            <div style="font-size:10.5px;color:var(--ink-faint);margin-top:4px">IPS: ${ips?ips.nombre:'—'} · Cirugía: ${formatDate(req.fecha_estimada_cirugia)} · Identificación: ${patient.tipo_identificacion} ${patient.numero_identificacion}</div>
           </div>
-          <div class="match-meta">${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''} ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm · Compatibilidad: ${Math.round(m.compatibility_score)}% · ${doctorName} aprobó</div>
-          <div style="font-size:10.5px;color:var(--ink-faint);margin-top:4px">IPS: ${ips?ips.nombre:'—'} · Cirugía: ${formatDate(req.fecha_estimada_cirugia)} · Identificación: ${patient.tipo_identificacion} ${patient.numero_identificacion}</div>
+          <span class="badge badge-green" style="align-self:center;white-space:nowrap">Doctor aprobó</span>
         </div>
-        <span class="badge badge-green" style="align-self:center;white-space:nowrap">Doctor aprobó</span>
-      </div>
-      <div class="match-footer">
-        <span style="font-size:11.5px;color:var(--ink-faint)">Último paso antes de etiquetado</span>
-        <div style="display:flex;gap:10px">
-          <button class="btn-success" onclick="aprobarAsignacionUI('${a.id}')"><i class="ti ti-check" style="font-size:13px"></i> Aprobar y asignar</button>
-          <button class="btn-danger" onclick="rechazarAsignacionUI('${a.id}')">Rechazar</button>
+        <div class="match-footer">
+          <span style="font-size:11.5px;color:var(--ink-faint)">Último paso antes de etiquetado</span>
+          <div style="display:flex;gap:10px">
+            <button class="btn-success" onclick="aprobarAsignacionUI('${a.id}')"><i class="ti ti-check" style="font-size:13px"></i> Aprobar y asignar</button>
+            <button class="btn-danger" onclick="rechazarAsignacionUI('${a.id}')">Rechazar</button>
+          </div>
         </div>
-      </div>
-    `;
-    return card;
+      `;
+      return card;
+    }catch(e){
+      return buildBrokenCard(a.id, e);
+    }
   }));
   cards.forEach(c=> container.appendChild(c));
 
   setText('stat-pend', pendientes.length);
+  setBadge('nav-badge-asignaciones', pendientes.length);
 }
 
 async function renderAsignacionesHistorial(){
@@ -616,17 +700,23 @@ async function renderAsignacionesHistorial(){
   tbody.innerHTML = '';
 
   const rows = await Promise.all(historial.map(async a=>{
-    const m = await API.matches.getById(a.match_id);
-    const req = await API.requests.getById(m.request_id);
-    const [patient, implant, ips] = await Promise.all([
-      API.compose.patient(req.patient_id),
-      API.compose.implant(m.implant_id),
-      API.compose.ips(req.ips_id),
-    ]);
+    let patient, implant, ips;
+    try{
+      const m = await API.matches.getById(a.match_id);
+      const req = await API.requests.getById(m.request_id);
+      [patient, implant, ips] = await Promise.all([
+        API.compose.patient(req.patient_id),
+        API.compose.implant(m.implant_id),
+        API.compose.ips(req.ips_id),
+      ]);
+    }catch(e){
+      console.warn('No se pudo cargar toda la información de la asignación ' + a.id + ':', e.message);
+      patient = null; implant = null; ips = null;
+    }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${patient.nombre} ${patient.apellido}</td>
-      <td>${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''}</td>
+      <td>${patient ? patient.nombre+' '+patient.apellido : '—'}</td>
+      <td>${implant ? implant.tipo_implante+(implant.codigo_visible ? ' '+implant.codigo_visible : '') : '—'}</td>
       <td>${ips?ips.nombre:'—'}</td>
       <td><span class="badge ${a.status==='aprobada'?'badge-green':'badge-red'}">${a.status==='aprobada'?'Aprobada':'Rechazada'}</span></td>
     `;
@@ -655,6 +745,7 @@ async function renderDespachosPorEtiquetar(){
   if(doneMsg) doneMsg.style.display = pendientes.length===0 ? 'block' : 'none';
 
   const cards = await Promise.all(pendientes.map(async d=>{
+   try{
     const a = await API.assignments.getById(d.assignment_id);
     const m = await API.matches.getById(a.match_id);
     const req = await API.requests.getById(m.request_id);
@@ -709,11 +800,15 @@ async function renderDespachosPorEtiquetar(){
       </div>
     `;
     return card;
+   }catch(e){
+    return buildBrokenCard(d.id, e);
+   }
   }));
   cards.forEach(c=> container.appendChild(c));
 
   setText('etiq-pend', pendientes.length);
   setText('etiq-tab-count', pendientes.length);
+  setBadge('nav-badge-etiquetado', pendientes.length);
 }
 
 async function renderDespachosEnCamino(){
@@ -726,6 +821,7 @@ async function renderDespachosEnCamino(){
   if(emptyMsg) emptyMsg.style.display = enCamino.length===0 ? 'block' : 'none';
 
   const cards = await Promise.all(enCamino.map(async d=>{
+   try{
     const a = await API.assignments.getById(d.assignment_id);
     const m = await API.matches.getById(a.match_id);
     const req = await API.requests.getById(m.request_id);
@@ -760,6 +856,9 @@ async function renderDespachosEnCamino(){
       </div>
     `;
     return card;
+   }catch(e){
+    return buildBrokenCard(d.id, e);
+   }
   }));
   cards.forEach(c=> container.appendChild(c));
 
@@ -778,21 +877,27 @@ async function renderDespachosEntregados(){
   tbody.innerHTML = '';
 
   const rows = await Promise.all(entregados.map(async d=>{
-    const a = await API.assignments.getById(d.assignment_id);
-    const m = await API.matches.getById(a.match_id);
-    const req = await API.requests.getById(m.request_id);
-    const [patient, implant, ips] = await Promise.all([
-      API.compose.patient(req.patient_id),
-      API.compose.implant(m.implant_id),
-      API.compose.ips(d.ips_id),
-    ]);
+    let req, patient, implant, ips;
+    try{
+      const a = await API.assignments.getById(d.assignment_id);
+      const m = await API.matches.getById(a.match_id);
+      req = await API.requests.getById(m.request_id);
+      [patient, implant, ips] = await Promise.all([
+        API.compose.patient(req.patient_id),
+        API.compose.implant(m.implant_id),
+        API.compose.ips(d.ips_id),
+      ]);
+    }catch(e){
+      console.warn('No se pudo cargar toda la información del despacho ' + d.id + ':', e.message);
+      req = null; patient = null; implant = null; ips = null;
+    }
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><span style="font-family:monospace;font-size:11px;background:var(--blue-faint);color:var(--blue-deep);padding:1px 7px;border-radius:4px">${req.codigo_visible || '—'}</span></td>
-      <td>${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''}</td>
-      <td>${patient.nombre} ${patient.apellido}</td>
+      <td><span style="font-family:monospace;font-size:11px;background:var(--blue-faint);color:var(--blue-deep);padding:1px 7px;border-radius:4px">${req && req.codigo_visible || '—'}</span></td>
+      <td>${implant ? implant.tipo_implante+(implant.codigo_visible ? ' '+implant.codigo_visible : '') : '—'}</td>
+      <td>${patient ? patient.nombre+' '+patient.apellido : '—'}</td>
       <td>${ips?ips.nombre:'—'}</td>
-      <td>${formatDate(req.fecha_estimada_cirugia)}</td>
+      <td>${req ? formatDate(req.fecha_estimada_cirugia) : '—'}</td>
       <td><span class="badge badge-green">Entregado</span></td>
     `;
     return tr;
@@ -982,7 +1087,17 @@ function copiarCredencial(inputId){
 // ==========================================================================
 async function renderPerfilDoctor(){
   if(!currentUser || currentUser.role !== 'doctor') return;
-  const profile = await API.doctorProfile.getByUserId(currentUser.id);
+  let profile;
+  try{
+    profile = await API.doctorProfile.getByUserId(currentUser.id);
+  }catch(e){
+    // El backend hoy exige rol admin en /doctors/{id} incluso cuando el
+    // doctor pide su propio perfil — falta la excepción de "es mi propio
+    // recurso" en la autorización del lado del servidor. Evita que este
+    // fallo tumbe el resto de refreshAll() mientras se corrige allá.
+    console.warn('No se pudo cargar el perfil del doctor:', e.message);
+    return;
+  }
   if(!profile) return;
   document.getElementById('perfil-id').value = profile.id;
   document.getElementById('perfil-nombre').value = profile.nombre;
@@ -1014,7 +1129,7 @@ async function guardarPerfilDoctor(){
 // Modal: Nueva solicitud — arranca vacío, lo llena quien hace la demo
 // ==========================================================================
 function prepararModalNuevaSolicitud(){
-  ['sol-tipo-identificacion','sol-nombre','sol-apellido','sol-fecha-nac','sol-edad','sol-nacionalidad',
+  ['sol-tipo-identificacion','sol-numero-identificacion','sol-nombre','sol-apellido','sol-fecha-nac','sol-edad','sol-nacionalidad','sol-sexo-biologico',
    'sol-ips-nombre','sol-ips-ciudad','sol-ips-direccion','sol-ips-telefono',
    'sol-tejido-tipo','sol-procedimiento','sol-fecha-cirugia','sol-alto','sol-ancho','sol-prof','sol-diagnostico'
   ].forEach(id=>{
@@ -1026,7 +1141,7 @@ function prepararModalNuevaSolicitud(){
 }
 
 function validarSolicitud(){
-  const requiredIds = ['sol-tipo-identificacion','sol-nombre','sol-apellido','sol-ips-nombre','sol-fecha-cirugia','sol-tejido-tipo','sol-alto','sol-ancho','sol-prof'];
+  const requiredIds = ['sol-tipo-identificacion','sol-numero-identificacion','sol-nombre','sol-apellido','sol-sexo-biologico','sol-ips-nombre','sol-fecha-cirugia','sol-tejido-tipo','sol-alto','sol-ancho','sol-prof'];
   let valid = true;
   requiredIds.forEach(id=>{
     const el = document.getElementById(id);
@@ -1044,50 +1159,71 @@ function validarSolicitud(){
 }
 
 async function enviarSolicitud(){
+  const errorBanner = document.getElementById('sol-form-error');
+  const errorMsg = document.getElementById('sol-form-error-msg');
+
   if(!validarSolicitud()){
-    const banner = document.getElementById('sol-form-error');
-    banner.style.display = 'flex';
-    banner.scrollIntoView({behavior:'smooth', block:'center'});
+    errorMsg.textContent = 'Completa los campos marcados para poder enviar la solicitud.';
+    errorBanner.style.display = 'flex';
+    errorBanner.scrollIntoView({behavior:'smooth', block:'center'});
     return;
   }
-  document.getElementById('sol-form-error').style.display = 'none';
+  errorBanner.style.display = 'none';
 
-  const ipsNombre = document.getElementById('sol-ips-nombre').value.trim();
-  let ips = await API.ips.findByName(ipsNombre);
-  if(!ips){
-    ips = await API.ips.create({
-      nombre: ipsNombre,
-      direccion: document.getElementById('sol-ips-direccion').value.trim(),
-      telefono: document.getElementById('sol-ips-telefono').value.trim(),
-      ciudad: document.getElementById('sol-ips-ciudad').value.trim(),
+  try{
+    const ipsNombre = document.getElementById('sol-ips-nombre').value.trim();
+    let ips = await API.ips.findByName(ipsNombre);
+    if(!ips){
+      ips = await API.ips.create({
+        nombre: ipsNombre,
+        direccion: document.getElementById('sol-ips-direccion').value.trim(),
+        telefono: document.getElementById('sol-ips-telefono').value.trim(),
+        ciudad: document.getElementById('sol-ips-ciudad').value.trim(),
+      });
+    }
+
+    const sexoNoImportante = document.getElementById('sol-sexo-no-importante')?.checked || false;
+    const numeroIdentificacion = document.getElementById('sol-numero-identificacion').value.trim();
+
+    // Buscar primero — solo crear un paciente nuevo si de verdad no existe.
+    let patient = await API.patients.findByIdentification(numeroIdentificacion);
+    if(!patient){
+      patient = await API.patients.create({
+        tipo_identificacion: document.getElementById('sol-tipo-identificacion').value,
+        numero_identificacion: numeroIdentificacion,
+        nombre: document.getElementById('sol-nombre').value.trim(),
+        apellido: document.getElementById('sol-apellido').value.trim(),
+        fecha_nacimiento: document.getElementById('sol-fecha-nac').value || null,
+        edad: Number(document.getElementById('sol-edad').value) || null,
+        nacionalidad: document.getElementById('sol-nacionalidad').value.trim(),
+        sexo_biologico: document.getElementById('sol-sexo-biologico')?.value || null,
+      });
+    }
+
+    // codigo_visible es obligatorio en POST /requests y no lo genera el
+    // backend — se arma acá como marcador legible (año + sufijo único).
+    // Si el backend luego pasa a generarlo él mismo, este valor sobra.
+    const codigoVisible = 'SOL-' + new Date().getFullYear() + '-' + Date.now().toString().slice(-6);
+
+    await API.requests.create({
+      codigo_visible: codigoVisible,
+      patient_id: patient.id,
+      ips_id: ips.id,
+      tejido_solicitado: document.getElementById('sol-tejido-tipo').value.trim(),
+      procedimiento_quirurgico: document.getElementById('sol-procedimiento').value.trim(),
+      alto_requerido: Math.round(Number(document.getElementById('sol-alto').value)),
+      ancho_requerido: Math.round(Number(document.getElementById('sol-ancho').value)),
+      profundidad_requerida: Math.round(Number(document.getElementById('sol-prof').value)),
+      fecha_estimada_cirugia: document.getElementById('sol-fecha-cirugia').value,
+      diagnostico: document.getElementById('sol-diagnostico').value.trim(),
+      sexo_importante: !sexoNoImportante,
     });
+  }catch(e){
+    errorMsg.textContent = 'No se pudo enviar la solicitud: ' + e.message;
+    errorBanner.style.display = 'flex';
+    errorBanner.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
   }
-
-  const sexoNoImportante = document.getElementById('sol-sexo-no-importante')?.checked || false;
-
-  const patient = await API.patients.create({
-    tipo_identificacion: document.getElementById('sol-tipo-identificacion').value,
-    nombre: document.getElementById('sol-nombre').value.trim(),
-    apellido: document.getElementById('sol-apellido').value.trim(),
-    fecha_nacimiento: document.getElementById('sol-fecha-nac').value || null,
-    edad: Number(document.getElementById('sol-edad').value) || null,
-    nacionalidad: document.getElementById('sol-nacionalidad').value.trim(),
-    sexo_biologico: document.getElementById('sol-sexo-biologico')?.value || null,
-  });
-
-  await API.requests.create({
-    patient_id: patient.id,
-    doctor_id: currentUser.id,
-    ips_id: ips.id,
-    tejido_solicitado: document.getElementById('sol-tejido-tipo').value.trim(),
-    procedimiento_quirurgico: document.getElementById('sol-procedimiento').value.trim(),
-    alto_requerido: Number(document.getElementById('sol-alto').value),
-    ancho_requerido: Number(document.getElementById('sol-ancho').value),
-    profundidad_requerida: Number(document.getElementById('sol-prof').value),
-    fecha_estimada_cirugia: document.getElementById('sol-fecha-cirugia').value,
-    diagnostico: document.getElementById('sol-diagnostico').value.trim(),
-    sexo_importante: !sexoNoImportante,
-  });
 
   const banner = document.getElementById('sol-success-banner');
   banner.style.display = 'flex';
@@ -1106,11 +1242,13 @@ let implantesPendientes = [];
 function prepararModalNuevoDonante(){
   implantesPendientes = [];
   renderImplantesLista();
-  ['donante-codigo','donante-fecha-extraccion','donante-fecha-procedimiento','donante-fecha-segundo-cambio','donante-fecha-vencimiento'].forEach(id=>{
+  ['donante-codigo','donante-fecha-extraccion','donante-fecha-procedimiento','donante-fecha-segundo-cambio','donante-fecha-vencimiento','donante-sexo-biologico'].forEach(id=>{
     const el = document.getElementById(id);
     if(el){ el.value=''; el.classList.remove('invalid'); }
   });
   document.getElementById('modal-donante-codigo-badge').textContent = '(sin código)';
+  document.getElementById('donante-form-error').style.display = 'none';
+  document.getElementById('donante-success-banner').style.display = 'none';
   cancelarEdicionImplante();
 }
 
@@ -1137,7 +1275,7 @@ function renderImplantesLista(){
     card.className = 'implant-card';
     card.innerHTML = `
       <div class="implant-header">
-        <div class="implant-title">Implante ${index + 1} — ${implante.tipo_implante || 'Sin tipo'}</div>
+        <div class="implant-title">Implante ${index + 1} — ${implante.tipo_implante || 'Sin tipo'}${implante.codigo_visible ? ' (' + implante.codigo_visible + ')' : ''}</div>
         <div class="implant-actions">
           <span class="badge ${estadoInfo.badge}">${estadoInfo.label}</span>
           <button type="button" class="implant-action-btn" title="Editar" onclick="editarImplante(${index})"><i class="ti ti-pencil"></i></button>
@@ -1157,6 +1295,7 @@ function renderImplantesLista(){
 }
 
 function limpiarFormularioImplante(){
+  document.getElementById('implant-codigo-visible').value = '';
   document.getElementById('implant-parte-cuerpo').value = '';
   document.getElementById('implant-tipo-implante').value = '';
   document.getElementById('implant-alto').value = '';
@@ -1169,7 +1308,7 @@ function limpiarFormularioImplante(){
   document.getElementById('implant-foto-preview').src = '';
   document.getElementById('implant-upload-icon').style.display = '';
   document.getElementById('implant-upload-text').style.display = '';
-  ['implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'].forEach(id=>{
+  ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'].forEach(id=>{
     document.getElementById(id).classList.remove('invalid');
     const err = document.getElementById(id+'-error');
     if(err) err.classList.remove('show');
@@ -1177,7 +1316,7 @@ function limpiarFormularioImplante(){
 }
 
 function validarFormularioImplante(){
-  const requiredIds = ['implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'];
+  const requiredIds = ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'];
   let valid = true;
   requiredIds.forEach(id=>{
     const el = document.getElementById(id);
@@ -1198,6 +1337,7 @@ function guardarImplanteEnLista(){
   if(!validarFormularioImplante()) return;
 
   const implante = {
+    codigo_visible: document.getElementById('implant-codigo-visible').value.trim(),
     parte_cuerpo: document.getElementById('implant-parte-cuerpo').value,
     tipo_implante: document.getElementById('implant-tipo-implante').value,
     alto: Number(document.getElementById('implant-alto').value),
@@ -1222,6 +1362,7 @@ function editarImplante(index){
   const implante = implantesPendientes[index];
   if(!implante) return;
 
+  document.getElementById('implant-codigo-visible').value = implante.codigo_visible || '';
   document.getElementById('implant-parte-cuerpo').value = implante.parte_cuerpo;
   document.getElementById('implant-tipo-implante').value = implante.tipo_implante;
   document.getElementById('implant-alto').value = implante.alto;
@@ -1282,27 +1423,50 @@ function previsualizarFotoImplante(input){
 }
 
 async function guardarDonanteEImplantes(){
-  const requiredDonorIds = ['donante-codigo','donante-fecha-extraccion','donante-fecha-vencimiento'];
+  const requiredDonorIds = ['donante-codigo','donante-fecha-extraccion','donante-fecha-vencimiento','donante-sexo-biologico'];
   let valid = true;
   requiredDonorIds.forEach(id=>{
     const el = document.getElementById(id);
-    if(!el.value || !el.value.trim()){ el.classList.add('invalid'); valid = false; }
-    else el.classList.remove('invalid');
+    const errorEl = document.getElementById(id+'-error');
+    if(!el.value || !el.value.trim()){
+      el.classList.add('invalid');
+      if(errorEl) errorEl.classList.add('show');
+      valid = false;
+    } else {
+      el.classList.remove('invalid');
+      if(errorEl) errorEl.classList.remove('show');
+    }
   });
   if(!valid) return;
 
-  const donor = await API.donors.create({
-    codigo_donante: document.getElementById('donante-codigo').value.trim(),
-    fecha_extraccion: document.getElementById('donante-fecha-extraccion').value,
-    fecha_procedimiento: document.getElementById('donante-fecha-procedimiento').value || null,
-    fecha_segundo_cambio: document.getElementById('donante-fecha-segundo-cambio').value || null,
-    fecha_vencimiento: document.getElementById('donante-fecha-vencimiento').value,
-  });
+  const errorBanner = document.getElementById('donante-form-error');
+  const successBanner = document.getElementById('donante-success-banner');
+  errorBanner.style.display = 'none';
+  successBanner.style.display = 'none';
 
-  await Promise.all(implantesPendientes.map(implante=> API.implants.create(donor.id, implante)));
+  try{
+    const donor = await API.donors.create({
+      codigo_donante: document.getElementById('donante-codigo').value.trim(),
+      fecha_extraccion: document.getElementById('donante-fecha-extraccion').value,
+      fecha_procedimiento: document.getElementById('donante-fecha-procedimiento').value || null,
+      fecha_segundo_cambio: document.getElementById('donante-fecha-segundo-cambio').value || null,
+      fecha_vencimiento: document.getElementById('donante-fecha-vencimiento').value,
+      sexo_biologico: document.getElementById('donante-sexo-biologico').value,
+    });
 
-  closeModal('modal-nuevo-tejido');
+    await Promise.all(implantesPendientes.map(implante=> API.implants.create(donor.id, implante)));
+  }catch(e){
+    document.getElementById('donante-form-error-msg').textContent = 'No se pudo guardar el donante: ' + e.message;
+    errorBanner.style.display = 'flex';
+    return;
+  }
+
+  successBanner.style.display = 'flex';
   refreshAll();
+  setTimeout(()=>{
+    successBanner.style.display = 'none';
+    closeModal('modal-nuevo-tejido');
+  }, 1200);
 }
 
 // ==========================================================================
@@ -1314,6 +1478,8 @@ async function abrirDetalleImplante(implantId){
   const donor = await API.compose.donor(implant.donor_id);
   const estadoInfo = ESTADO_LABELS[implant.estado] || ESTADO_LABELS.disponible;
   const expiring = donor ? (daysUntil(donor.fecha_vencimiento) <= 7 && daysUntil(donor.fecha_vencimiento) >= 0) : false;
+
+  document.getElementById('det-implante-id').value = implant.id;
 
   setText('det-implante-titulo', implant.tipo_implante);
   setText('det-implante-donor-codigo', donor ? donor.codigo_donante : '—');
@@ -1334,6 +1500,163 @@ async function abrirDetalleImplante(implantId){
   else fotoWrap.style.display = 'none';
 
   openModal('modal-detalle-implante');
+}
+
+// ==========================================================================
+// Editar implante existente / editar donante / agregar implante a un
+// donante ya registrado (Panel Tejidos)
+// ==========================================================================
+async function abrirEditarImplanteUI(implantId){
+  const implant = await API.implants.getById(implantId);
+  if(!implant) return;
+  document.getElementById('edit-implant-id').value = implant.id;
+  document.getElementById('edit-implant-codigo-visible').value = implant.codigo_visible || '';
+  document.getElementById('edit-implant-parte-cuerpo').value = implant.parte_cuerpo || '';
+  document.getElementById('edit-implant-tipo-implante').value = implant.tipo_implante || '';
+  document.getElementById('edit-implant-alto').value = implant.alto ?? '';
+  document.getElementById('edit-implant-ancho').value = implant.ancho ?? '';
+  document.getElementById('edit-implant-estado').value = implant.estado || 'disponible';
+  document.getElementById('edit-implant-notas').value = implant.notas_adicionales || '';
+  document.getElementById('edit-implant-error').style.display = 'none';
+  ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho'].forEach(id=>{
+    document.getElementById(id).classList.remove('invalid');
+    const err = document.getElementById(id+'-error');
+    if(err) err.classList.remove('show');
+  });
+  openModal('modal-editar-implante');
+}
+
+async function guardarEdicionImplanteUI(){
+  const requiredIds = ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho'];
+  let valid = true;
+  requiredIds.forEach(id=>{
+    const el = document.getElementById(id);
+    const errorEl = document.getElementById(id+'-error');
+    if(!el.value || !el.value.trim()){
+      el.classList.add('invalid');
+      if(errorEl) errorEl.classList.add('show');
+      valid = false;
+    } else {
+      el.classList.remove('invalid');
+      if(errorEl) errorEl.classList.remove('show');
+    }
+  });
+  if(!valid) return;
+
+  const id = document.getElementById('edit-implant-id').value;
+  const errorBanner = document.getElementById('edit-implant-error');
+  errorBanner.style.display = 'none';
+
+  try{
+    await API.implants.update(id, {
+      codigo_visible: document.getElementById('edit-implant-codigo-visible').value.trim(),
+      parte_cuerpo: document.getElementById('edit-implant-parte-cuerpo').value,
+      tipo_implante: document.getElementById('edit-implant-tipo-implante').value,
+      alto: Number(document.getElementById('edit-implant-alto').value),
+      ancho: Number(document.getElementById('edit-implant-ancho').value),
+      estado: document.getElementById('edit-implant-estado').value,
+      notas_adicionales: document.getElementById('edit-implant-notas').value.trim(),
+    });
+  }catch(e){
+    document.getElementById('edit-implant-error-msg').textContent = 'No se pudo guardar el implante: ' + e.message;
+    errorBanner.style.display = 'flex';
+    return;
+  }
+
+  closeModal('modal-editar-implante');
+  refreshAll();
+}
+
+async function abrirEditarDonanteUI(donorId){
+  const donor = await API.donors.getById(donorId);
+  if(!donor) return;
+  document.getElementById('edit-donante-id').value = donor.id;
+  document.getElementById('edit-donante-codigo').value = donor.codigo_donante || '';
+  document.getElementById('edit-donante-fecha-extraccion').value = donor.fecha_extraccion || '';
+  document.getElementById('edit-donante-fecha-procedimiento').value = donor.fecha_procedimiento || '';
+  document.getElementById('edit-donante-fecha-segundo-cambio').value = donor.fecha_segundo_cambio || '';
+  document.getElementById('edit-donante-fecha-vencimiento').value = donor.fecha_vencimiento || '';
+  document.getElementById('edit-donante-sexo-biologico').value = donor.sexo_biologico || '';
+  document.getElementById('edit-donante-error').style.display = 'none';
+  openModal('modal-editar-donante');
+}
+
+async function guardarEdicionDonanteUI(){
+  const id = document.getElementById('edit-donante-id').value;
+  const errorBanner = document.getElementById('edit-donante-error');
+  errorBanner.style.display = 'none';
+
+  try{
+    await API.donors.update(id, {
+      codigo_donante: document.getElementById('edit-donante-codigo').value.trim(),
+      fecha_extraccion: document.getElementById('edit-donante-fecha-extraccion').value,
+      fecha_procedimiento: document.getElementById('edit-donante-fecha-procedimiento').value || null,
+      fecha_segundo_cambio: document.getElementById('edit-donante-fecha-segundo-cambio').value || null,
+      fecha_vencimiento: document.getElementById('edit-donante-fecha-vencimiento').value,
+      sexo_biologico: document.getElementById('edit-donante-sexo-biologico').value || null,
+    });
+  }catch(e){
+    document.getElementById('edit-donante-error-msg').textContent = 'No se pudo guardar el donante: ' + e.message;
+    errorBanner.style.display = 'flex';
+    return;
+  }
+
+  closeModal('modal-editar-donante');
+  refreshAll();
+}
+
+async function abrirAgregarImplanteUI(donorId){
+  const donor = await API.donors.getById(donorId);
+  if(!donor) return;
+  document.getElementById('agregar-implante-donor-id').value = donorId;
+  setText('agregar-implante-donor-codigo', donor.codigo_donante || '');
+  ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho','agregar-implante-notas'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('agregar-implante-estado').value = 'disponible';
+  document.getElementById('agregar-implante-error').style.display = 'none';
+  openModal('modal-agregar-implante');
+}
+
+async function guardarImplanteAgregadoUI(){
+  const requiredIds = ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho'];
+  let valid = true;
+  requiredIds.forEach(id=>{
+    const el = document.getElementById(id);
+    const errorEl = document.getElementById(id+'-error');
+    if(!el.value || !el.value.trim()){
+      el.classList.add('invalid');
+      if(errorEl) errorEl.classList.add('show');
+      valid = false;
+    } else {
+      el.classList.remove('invalid');
+      if(errorEl) errorEl.classList.remove('show');
+    }
+  });
+  if(!valid) return;
+
+  const donorId = document.getElementById('agregar-implante-donor-id').value;
+  const errorBanner = document.getElementById('agregar-implante-error');
+  errorBanner.style.display = 'none';
+
+  try{
+    await API.implants.create(donorId, {
+      codigo_visible: document.getElementById('agregar-implante-codigo-visible').value.trim(),
+      parte_cuerpo: document.getElementById('agregar-implante-parte-cuerpo').value,
+      tipo_implante: document.getElementById('agregar-implante-tipo-implante').value,
+      alto: Number(document.getElementById('agregar-implante-alto').value),
+      ancho: Number(document.getElementById('agregar-implante-ancho').value),
+      estado: document.getElementById('agregar-implante-estado').value,
+      notas_adicionales: document.getElementById('agregar-implante-notas').value.trim(),
+    });
+  }catch(e){
+    document.getElementById('agregar-implante-error-msg').textContent = 'No se pudo agregar el implante: ' + e.message;
+    errorBanner.style.display = 'flex';
+    return;
+  }
+
+  closeModal('modal-agregar-implante');
+  refreshAll();
 }
 
 async function abrirDetalleSolicitud(requestId){
@@ -1446,13 +1769,18 @@ async function renderMatchesPorAprobarDoctor(){
   const badge     = document.getElementById('doctor-matches-badge');
   if(!container || !currentUser) return;
 
-  // Solo matches enviados que correspondan a solicitudes del doctor actual
-  const [misSol, allEnviados] = await Promise.all([
+  // GET /matches?status=enviado debería devolver solo lo de este doctor,
+  // pero no siempre viene así filtrado (o hay datos de prueba con el
+  // doctor_id mal asignado) — se cruza contra sus propias solicitudes
+  // antes de intentar enriquecer cada match, para no llamar /requests/{id}
+  // sobre una solicitud de otro doctor (eso 403ea, y sin este cruce se ve
+  // como una tarjeta rota en vez de simplemente no mostrarla).
+  const [misSol, candidatos] = await Promise.all([
     API.requests.listByDoctor(currentUser.id),
     API.matches.listByStatus(['enviado']),
   ]);
   const misSolIds = misSol.map(r => r.id);
-  const mis = allEnviados.filter(m => misSolIds.includes(m.request_id));
+  const mis = candidatos.filter(m => misSolIds.includes(m.request_id));
 
   container.innerHTML = '';
   const count = mis.length;
@@ -1462,17 +1790,18 @@ async function renderMatchesPorAprobarDoctor(){
     badge.style.display = count > 0 ? 'inline-block' : 'none';
   }
   setText('sol-stat-match-pendiente', count);
-  const cards = await Promise.all(mis.map(buildMatchCardDoctor));
+  const cards = await Promise.all(mis.map(m=> buildMatchCardDoctor(m).catch(e=> buildBrokenCard(m.id, e))));
   cards.forEach(c => container.appendChild(c));
 }
 
 async function aprobarMatchDoctorUI(matchId){
-  await API.matches.approveDoctor(matchId, currentUser.id);
+  await API.matches.approveDoctor(matchId);
   refreshAll();
 }
 
 async function rechazarMatchDoctorUI(matchId){
-  await API.matches.rejectDoctor(matchId, currentUser.id, 'Rechazado por el médico');
+  const reason = window.prompt('Motivo del rechazo (opcional):', '') || '';
+  await API.matches.rejectDoctor(matchId, reason);
   refreshAll();
 }
 
@@ -1484,24 +1813,35 @@ async function refreshAll(){
   // Cada render* toca una parte distinta e independiente del DOM, así que
   // se disparan en paralelo en vez de esperarlas una por una — evita una
   // cascada secuencial de ~16 rondas de red cada vez que se refresca todo.
-  await Promise.all([
-    renderMisSolicitudes(),
-    renderMatchesPorAprobarDoctor(),
-    renderTodasSolicitudes(),
-    renderInventarioTejidos(),
-    renderPorVencerTejidos(),
-    renderHistorialDonantes(),
-    renderMatchesPendientes(),
-    renderMatchesEsperando(),
-    renderMatchesHistorial(),
-    renderAsignacionesPendientes(),
-    renderAsignacionesHistorial(),
-    renderDespachosPorEtiquetar(),
-    renderDespachosEnCamino(),
-    renderDespachosEntregados(),
-    renderPerfilDoctor(),
-    renderDoctoresAdmin(),
-  ]);
+  //
+  // El backend ahora exige rol admin para /doctors, /donors, /implants y
+  // /dispatches (403 si un doctor los llama) — mismo corte de acceso que
+  // ya existía visualmente vía nav-doctor-only / nav-admin-only en
+  // index.html. Se replica aquí para no disparar llamadas que el doctor
+  // no tiene permiso de hacer.
+  if(currentUser.role === 'doctor'){
+    await Promise.all([
+      renderMisSolicitudes(),
+      renderMatchesPorAprobarDoctor(),
+      renderPerfilDoctor(),
+    ]);
+  } else {
+    await Promise.all([
+      renderTodasSolicitudes(),
+      renderInventarioTejidos(),
+      renderPorVencerTejidos(),
+      renderHistorialDonantes(),
+      renderMatchesPendientes(),
+      renderMatchesEsperando(),
+      renderMatchesHistorial(),
+      renderAsignacionesPendientes(),
+      renderAsignacionesHistorial(),
+      renderDespachosPorEtiquetar(),
+      renderDespachosEnCamino(),
+      renderDespachosEntregados(),
+      renderDoctoresAdmin(),
+    ]);
+  }
 }
 
 // ---- Reloj en la topbar -----------------------------------------------------
@@ -1520,6 +1860,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
   actualizarReloj();
   setInterval(actualizarReloj, 30000);
   setInterval(()=>{ if(currentUser) renderMatchesEsperando(); }, 30000);
+
+  // Restaurar sesión tras un refresh — si ya había token+usuario guardados,
+  // entra directo en vez de mostrar el login de nuevo. Si el token ya
+  // expiró, la primera llamada real a la API lo detecta (401) y cierra
+  // sesión sola.
+  const restored = API.auth.restoreSession();
+  if(restored) entrarComo(restored.user);
 
   renderImplantesLista(); // muestra el mensaje de "vacío" desde el primer render
 

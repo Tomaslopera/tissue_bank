@@ -36,15 +36,73 @@
 
 const API_BASE = 'https://dml5behlp3.execute-api.us-east-1.amazonaws.com';
 const TOKEN_KEY = 'tissuebank_token';
+const USER_KEY = 'tissuebank_user';
 
 function getToken(){ return localStorage.getItem(TOKEN_KEY); }
 function setToken(token){ localStorage.setItem(TOKEN_KEY, token); }
 function clearToken(){ localStorage.removeItem(TOKEN_KEY); }
 
+// El usuario normalizado se guarda junto al token para poder restaurar la
+// sesión en un refresh de la página sin tener que volver a pedir login —
+// no hay endpoint "whoami" en la API para reconstruirlo de otra forma.
+function getStoredUser(){
+  try{
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){
+    return null;
+  }
+}
+function setStoredUser(user){ localStorage.setItem(USER_KEY, JSON.stringify(user)); }
+function clearStoredUser(){ localStorage.removeItem(USER_KEY); }
+
 // ==========================================================================
 // Helper interno de fetch — agrega el token, maneja 401 y parsea JSON.
 // ==========================================================================
+
+// Límite de peticiones simultáneas al backend. Cada panel dispara muchas
+// llamadas en paralelo (una por fila, por cada dato relacionado), y
+// refreshAll() dispara todos los paneles a la vez — sin este límite se
+// pueden mandar decenas/cientos de peticiones al mismo tiempo, lo que
+// satura Lambdas/conexiones a la BD y causa fallas intermitentes que no
+// tienen que ver con los datos en sí. Las que exceden el límite esperan
+// en cola en vez de dispararse todas de una. Ajustar este número según lo
+// que el backend realmente aguante (ideal: que el backend tenga su propio
+// pool de conexiones y esto deje de ser necesario).
+const MAX_CONCURRENT_REQUESTS = 6;
+let activeRequests = 0;
+const requestQueue = [];
+
+function acquireSlot(){
+  return new Promise(resolve=>{
+    const tryAcquire = ()=>{
+      if(activeRequests < MAX_CONCURRENT_REQUESTS){
+        activeRequests++;
+        resolve();
+      } else {
+        requestQueue.push(tryAcquire);
+      }
+    };
+    tryAcquire();
+  });
+}
+
+function releaseSlot(){
+  activeRequests--;
+  const next = requestQueue.shift();
+  if(next) next();
+}
+
 async function request(method, path, body){
+  await acquireSlot();
+  try{
+    return await doRequest(method, path, body);
+  } finally {
+    releaseSlot();
+  }
+}
+
+async function doRequest(method, path, body){
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if(token) headers['Authorization'] = 'Bearer ' + token;
@@ -111,6 +169,17 @@ async function getOrNull(path){
 function unwrapList(payload){
   if(Array.isArray(payload)) return payload;
   if(payload && Array.isArray(payload.data)) return payload.data;
+  // Formas alternativas vistas en APIs sobre AWS (p.ej. Lambda devolviendo
+  // el resultado crudo de un scan/query de DynamoDB, que usa "Items" con
+  // mayúscula, o wrappers tipo { items } / { results }).
+  if(payload && Array.isArray(payload.Items)) return payload.Items;
+  if(payload && Array.isArray(payload.items)) return payload.items;
+  if(payload && Array.isArray(payload.results)) return payload.results;
+  // Si llega hasta aquí, la respuesta no tiene ninguna forma reconocida —
+  // antes esto devolvía [] en silencio (por eso una tabla vacía no mostraba
+  // ningún error). Ahora se avisa en consola con la forma real recibida
+  // para poder ajustar esta función al contrato real del backend.
+  console.warn('unwrapList: no reconozco la forma de esta respuesta de lista, revisa el payload real:', payload);
   return [];
 }
 
@@ -143,7 +212,7 @@ function computeInitials(name){
 
 function normalizeUser(u){
   const role = u.role;
-  const rawName = u.displayName || u.nombre || null;
+  const rawName = u.display_name || u.displayName || u.nombre || null;
   let displayName, initials;
   if(role === 'admin'){
     displayName = rawName || 'Edison Ríos';
@@ -198,10 +267,22 @@ const API = {
       const body = await res.json();
       if(body.user && body.user.is_active === false) return { inactive: true };
 
+      const user = normalizeUser(body.user);
       setToken(body.token);
-      return { user: normalizeUser(body.user) };
+      setStoredUser(user);
+      return { user };
     },
-    logout(){ clearToken(); },
+    logout(){ clearToken(); clearStoredUser(); },
+    // Restaura la sesión guardada tras un refresh de la página — no valida
+    // el token contra el servidor (no hay endpoint para eso); si el token
+    // ya expiró, la primera llamada real a la API devolverá 401 y el
+    // helper de request() ya se encarga de cerrar la sesión en ese caso.
+    restoreSession(){
+      const token = getToken();
+      const user = getStoredUser();
+      if(!token || !user) return null;
+      return { user };
+    },
   },
 
   // ==========================================================================
@@ -279,6 +360,14 @@ const API = {
   },
 
   patients: {
+    // Busca un paciente ya registrado por número de identificación antes de
+    // crear uno nuevo — evita el conflicto "Ya existe un paciente registrado
+    // con esa identificación" en POST /patients cuando el paciente ya existe.
+    async findByIdentification(numeroIdentificacion){
+      const payload = await get('/patients?search=' + encodeURIComponent(numeroIdentificacion));
+      const list = unwrapList(payload);
+      return list.find(p => p.numero_identificacion === numeroIdentificacion) || list[0] || null;
+    },
     async create(data){
       return post('/patients', {
         tipo_identificacion: data.tipo_identificacion,
@@ -306,6 +395,10 @@ const API = {
         sexo_biologico: data.sexo_biologico || null,
       });
     },
+    async update(id, fields){
+      const current = await get('/donors/' + id);
+      return put('/donors/' + id, Object.assign({}, current, fields));
+    },
   },
 
   implants: {
@@ -318,6 +411,7 @@ const API = {
     async create(donorId, data){
       return post('/implants', {
         donor_id: donorId,
+        codigo_visible: data.codigo_visible,
         parte_cuerpo: data.parte_cuerpo,
         tipo_implante: data.tipo_implante,
         alto: data.alto ?? null,
@@ -343,7 +437,11 @@ const API = {
     async list(){ return unwrapList(await get('/requests')); },
     async listByDoctor(doctorId){
       const all = await this.list();
-      return all.filter(r => r.doctor_id === doctorId);
+      // Si el backend ya filtra GET /requests por el JWT del doctor, es
+      // posible que cada registro no traiga doctor_id (es implícito: son
+      // suyas). En ese caso no descartar la fila — solo filtrar cuando el
+      // campo sí viene y no coincide.
+      return all.filter(r => !r.doctor_id || r.doctor_id === doctorId);
     },
     async getById(id){ return getOrNull('/requests/' + id); },
     async getStatus(id){
@@ -355,9 +453,10 @@ const API = {
       return STATUS_LABELS[status] || STATUS_LABELS.en_fila;
     },
     async create(data){
+      // doctor_id NO va en el body — el backend lo toma del JWT.
       return post('/requests', {
+        codigo_visible: data.codigo_visible,
         patient_id: data.patient_id,
-        doctor_id: data.doctor_id,
         ips_id: data.ips_id,
         tejido_solicitado: data.tejido_solicitado,
         procedimiento_quirurgico: data.procedimiento_quirurgico || '',
@@ -374,25 +473,29 @@ const API = {
   matches: {
     async list(){ return unwrapList(await get('/matches')); },
     async listByStatus(statuses){
+      const list = Array.isArray(statuses) ? statuses : [statuses];
+      // Con un solo estado, usar el query param: el backend filtra
+      // server-side, y para un doctor devuelve automáticamente solo los
+      // matches de sus propias solicitudes (confirmado). Con varios
+      // estados a la vez (ej. el historial) no hay endpoint compuesto
+      // documentado, así que se trae todo y se filtra en el cliente.
+      if(list.length === 1){
+        return unwrapList(await get('/matches?status=' + encodeURIComponent(list[0])));
+      }
       const all = await this.list();
-      return all.filter(m => statuses.includes(m.status));
+      return all.filter(m => list.includes(m.status));
     },
     async getById(id){ return getOrNull('/matches/' + id); },
     async send(matchId){ return post('/matches/' + matchId + '/send'); },
     async cancelSend(matchId){ return post('/matches/' + matchId + '/cancel'); },
     async resend(matchId){ return post('/matches/' + matchId + '/resend'); },
-    async approveDoctor(matchId, doctorUserId){
-      return put('/matches/' + matchId + '/doctor-response', {
-        status: 'aprobado_doctor',
-        decided_by: doctorUserId,
-      });
+    async approveDoctor(matchId){
+      return put('/matches/' + matchId + '/doctor-response', { approved: true });
     },
-    async rejectDoctor(matchId, doctorUserId, reason){
-      return put('/matches/' + matchId + '/doctor-response', {
-        status: 'rechazado_doctor',
-        decided_by: doctorUserId,
-        rejection_reason: reason || '',
-      });
+    async rejectDoctor(matchId, reason){
+      const body = { approved: false };
+      if(reason) body.rejection_reason = reason;
+      return put('/matches/' + matchId + '/doctor-response', body);
     },
   },
 
