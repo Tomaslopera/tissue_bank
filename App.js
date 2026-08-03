@@ -40,6 +40,22 @@ const ESTADO_LABELS = {
   despachado: { label: 'Despachado', badge: 'badge-gray' },
 };
 
+// Copia local de las etiquetas de estado de solicitud (misma tabla que usa
+// API.requests.getStatusLabel() internamente en data.js). Se duplica aquí
+// para las tablas que necesitan el estado de cada fila tanto para pintar
+// el badge como para las tarjetas de conteo — así solo se hace una llamada
+// a API.requests.getStatus() por fila en vez de dos.
+const STATUS_LABELS = {
+  en_fila:          { label: 'En fila',          badge: 'badge-gray'   },
+  match_detectado:  { label: 'Match detectado',  badge: 'badge-purple' },
+  match_enviado:    { label: 'Match enviado',    badge: 'badge-blue'   },
+  por_asignar:      { label: 'Por asignar',      badge: 'badge-blue'   },
+  asignada:         { label: 'Asignada',         badge: 'badge-amber'  },
+  etiquetado:       { label: 'Etiquetado',       badge: 'badge-blue'   },
+  en_camino:        { label: 'En camino',        badge: 'badge-blue'   },
+  entregada:        { label: 'Entregada',        badge: 'badge-green'  },
+};
+
 // ==========================================================================
 // Navegación entre paneles
 // ==========================================================================
@@ -97,14 +113,22 @@ function closeModal(id){
 // ==========================================================================
 // Autenticación — valida contra API.auth.login (data.js)
 // ==========================================================================
-function iniciarSesion(){
+async function iniciarSesion(){
   const userInput = document.getElementById('login-user');
   const passInput = document.getElementById('login-pass');
   const errorBox = document.getElementById('login-error');
 
   const username = userInput.value.trim().toLowerCase();
   const password = passInput.value;
-  const result = API.auth.login(username, password);
+
+  let result;
+  try{
+    result = await API.auth.login(username, password);
+  }catch(e){
+    errorBox.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:14px"></i> No se pudo conectar con el servidor. Intenta de nuevo.';
+    errorBox.classList.add('show');
+    return;
+  }
 
   if(!result || result.inactive){
     errorBox.innerHTML = '<i class="ti ti-alert-triangle" style="font-size:14px"></i> ' + (result?.inactive
@@ -137,6 +161,7 @@ function entrarComo(user){
 }
 
 function cerrarSesion(){
+  API.auth.logout();
   currentUser = null;
   document.getElementById('app-shell').classList.remove('open');
   document.getElementById('login-screen').style.display = 'flex';
@@ -149,19 +174,22 @@ function cerrarSesion(){
 // ==========================================================================
 // Panel Solicitantes (doctor) — "Mis solicitudes"
 // ==========================================================================
-function renderMisSolicitudes(){
+async function renderMisSolicitudes(){
   const tbody = document.getElementById('mis-solicitudes-body');
   const emptyMsg = document.getElementById('mis-solicitudes-empty');
   if(!tbody || !currentUser) return;
 
-  const reqs = API.requests.listByDoctor(currentUser.id);
+  const reqs = await API.requests.listByDoctor(currentUser.id);
   tbody.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = reqs.length === 0 ? 'block' : 'none';
 
-  reqs.forEach(r=>{
-    const p = API.compose.patient(r.patient_id);
-    const ips = API.compose.ips(r.ips_id);
-    const statusInfo = API.requests.getStatusLabel(r.id);
+  const rows = await Promise.all(reqs.map(async r=>{
+    const [p, ips, status] = await Promise.all([
+      API.compose.patient(r.patient_id),
+      API.compose.ips(r.ips_id),
+      API.requests.getStatus(r.id),
+    ]);
+    const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.en_fila;
     const tr = document.createElement('tr');
     tr.className = 'row-clickable';
     tr.onclick = ()=>abrirDetalleSolicitud(r.id);
@@ -173,30 +201,34 @@ function renderMisSolicitudes(){
       <td>${formatDate(r.fecha_estimada_cirugia)}</td>
       <td><span class="badge ${statusInfo.badge}">${statusInfo.label}</span></td>
     `;
-    tbody.appendChild(tr);
-  });
+    return { tr, status };
+  }));
+  rows.forEach(({tr})=> tbody.appendChild(tr));
 
-  const statusOf = r => API.requests.getStatus(r.id);
   setText('sol-stat-activas', reqs.length);
-  setText('sol-stat-en-fila', reqs.filter(r=>statusOf(r)==='en_fila').length);
-  setText('sol-stat-match-pendiente', reqs.filter(r=>['match_detectado','match_enviado','por_asignar'].includes(statusOf(r))).length);
-  setText('sol-stat-asignadas', reqs.filter(r=>['asignada','etiquetado','en_camino','entregada'].includes(statusOf(r))).length);
+  setText('sol-stat-en-fila', rows.filter(x=>x.status==='en_fila').length);
+  setText('sol-stat-match-pendiente', rows.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
+  setText('sol-stat-asignadas', rows.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
 }
 
 // ==========================================================================
 // Panel Solicitudes (admin, solo lectura)
 // ==========================================================================
-function renderTodasSolicitudes(){
+async function renderTodasSolicitudes(){
   const tbody = document.getElementById('todas-solicitudes-body');
   if(!tbody) return;
 
-  const reqs = API.requests.list();
+  const reqs = await API.requests.list();
   tbody.innerHTML = '';
-  reqs.forEach(r=>{
-    const p = API.compose.patient(r.patient_id);
-    const ips = API.compose.ips(r.ips_id);
-    const doctorName = API.compose.doctorDisplayName(r.doctor_id);
-    const statusInfo = API.requests.getStatusLabel(r.id);
+
+  const rows = await Promise.all(reqs.map(async r=>{
+    const [p, ips, doctorName, status] = await Promise.all([
+      API.compose.patient(r.patient_id),
+      API.compose.ips(r.ips_id),
+      API.compose.doctorDisplayName(r.doctor_id),
+      API.requests.getStatus(r.id),
+    ]);
+    const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.en_fila;
     const tr = document.createElement('tr');
     tr.className = 'row-clickable';
     tr.onclick = ()=>abrirDetalleSolicitud(r.id);
@@ -209,14 +241,14 @@ function renderTodasSolicitudes(){
       <td>${doctorName}</td>
       <td><span class="badge ${statusInfo.badge}">${statusInfo.label}</span></td>
     `;
-    tbody.appendChild(tr);
-  });
+    return { tr, status };
+  }));
+  rows.forEach(({tr})=> tbody.appendChild(tr));
 
-  const statusOf = r => API.requests.getStatus(r.id);
   setText('adm-stat-total', reqs.length);
-  setText('adm-stat-en-fila', reqs.filter(r=>statusOf(r)==='en_fila').length);
-  setText('adm-stat-en-proceso', reqs.filter(r=>['match_detectado','match_enviado','por_asignar'].includes(statusOf(r))).length);
-  setText('adm-stat-resueltas', reqs.filter(r=>['asignada','etiquetado','en_camino','entregada'].includes(statusOf(r))).length);
+  setText('adm-stat-en-fila', rows.filter(x=>x.status==='en_fila').length);
+  setText('adm-stat-en-proceso', rows.filter(x=>['match_detectado','match_enviado','por_asignar'].includes(x.status)).length);
+  setText('adm-stat-resueltas', rows.filter(x=>['asignada','etiquetado','en_camino','entregada'].includes(x.status)).length);
 }
 
 // ==========================================================================
@@ -241,13 +273,12 @@ function buildImplantTile(implant, donor, expiring){
   return tile;
 }
 
-function renderInventarioTejidos(){
+async function renderInventarioTejidos(){
   const container = document.getElementById('inventario-donor-groups');
   const emptyMsg = document.getElementById('inventario-vacio');
   if(!container) return;
 
-  const donors = API.donors.list();
-  const implants = API.implants.list();
+  const [donors, implants] = await Promise.all([API.donors.list(), API.implants.list()]);
   container.innerHTML = '';
   let totalTiles = 0, disponibles = 0, reservados = 0, donantesActivos = 0;
 
@@ -289,13 +320,12 @@ function renderInventarioTejidos(){
   setText('tej-stat-donantes', donantesActivos);
 }
 
-function renderPorVencerTejidos(){
+async function renderPorVencerTejidos(){
   const container = document.getElementById('vencer-donor-groups');
   const emptyMsg = document.getElementById('vencer-vacio');
   if(!container) return;
 
-  const donors = API.donors.list();
-  const implants = API.implants.list();
+  const [donors, implants] = await Promise.all([API.donors.list(), API.implants.list()]);
   container.innerHTML = '';
   let count = 0;
 
@@ -330,12 +360,11 @@ function renderPorVencerTejidos(){
   setText('tej-stat-por-vencer', count);
 }
 
-function renderHistorialDonantes(){
+async function renderHistorialDonantes(){
   const tbody = document.getElementById('historial-donantes-body');
   if(!tbody) return;
 
-  const donors = API.donors.list();
-  const implants = API.implants.list();
+  const [donors, implants] = await Promise.all([API.donors.list(), API.implants.list()]);
   tbody.innerHTML = '';
 
   donors.forEach(donor=>{
@@ -376,11 +405,13 @@ function buildCompatRow(label, requestVal, percent, implantVal){
   </div>`;
 }
 
-function buildMatchCardPendiente(m){
-  const req = API.requests.getById(m.request_id);
-  const patient = API.compose.patient(req.patient_id);
-  const implant = API.compose.implant(m.implant_id);
-  const doctorName = API.compose.doctorDisplayName(req.doctor_id);
+async function buildMatchCardPendiente(m){
+  const req = await API.requests.getById(m.request_id);
+  const [patient, implant, doctorName] = await Promise.all([
+    API.compose.patient(req.patient_id),
+    API.compose.implant(m.implant_id),
+    API.compose.doctorDisplayName(req.doctor_id),
+  ]);
   const scoreClass = m.compatibility_score>=85 ? '' : (m.compatibility_score>=70 ? 'mid' : 'low');
 
   const card = document.createElement('div');
@@ -420,26 +451,32 @@ function buildMatchCardPendiente(m){
   return card;
 }
 
-function renderMatchesPendientes(){
+async function renderMatchesPendientes(){
   const container = document.getElementById('matches-pendientes-list');
   const emptyMsg = document.getElementById('matches-pendientes-vacio');
   if(!container) return;
 
-  const matches = API.matches.listByStatus(['detectado']);
+  const [matches, allMatches] = await Promise.all([
+    API.matches.listByStatus(['detectado']),
+    API.matches.list(),
+  ]);
   container.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = matches.length===0 ? 'block' : 'none';
-  matches.forEach(m=> container.appendChild(buildMatchCardPendiente(m)));
+  const cards = await Promise.all(matches.map(buildMatchCardPendiente));
+  cards.forEach(c=> container.appendChild(c));
 
   setText('reco-pendientes-count', matches.length);
   setText('reco-stat-por-enviar', matches.length);
-  setText('reco-stat-detectados', API.matches.list().length);
+  setText('reco-stat-detectados', allMatches.length);
 }
 
-function buildMatchCardEsperando(m){
-  const req = API.requests.getById(m.request_id);
-  const patient = API.compose.patient(req.patient_id);
-  const implant = API.compose.implant(m.implant_id);
-  const doctorName = API.compose.doctorDisplayName(req.doctor_id);
+async function buildMatchCardEsperando(m){
+  const req = await API.requests.getById(m.request_id);
+  const [patient, implant, doctorName] = await Promise.all([
+    API.compose.patient(req.patient_id),
+    API.compose.implant(m.implant_id),
+    API.compose.doctorDisplayName(req.doctor_id),
+  ]);
   const sentDate = m.sent_at ? new Date(m.sent_at) : null;
   const minutesAgo = sentDate ? Math.max(0, Math.round((Date.now()-sentDate.getTime())/60000)) : null;
   const tiempoTxt = minutesAgo===null ? '—' : (minutesAgo<60 ? `${minutesAgo} min` : `${Math.round(minutesAgo/60)} h`);
@@ -473,30 +510,33 @@ function buildMatchCardEsperando(m){
   return card;
 }
 
-function renderMatchesEsperando(){
+async function renderMatchesEsperando(){
   const container = document.getElementById('matches-esperando-list');
   const emptyMsg = document.getElementById('reco-esperando-empty');
   if(!container) return;
 
-  const matches = API.matches.listByStatus(['enviado']);
+  const matches = await API.matches.listByStatus(['enviado']);
   container.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = matches.length===0 ? 'block' : 'none';
-  matches.forEach(m=> container.appendChild(buildMatchCardEsperando(m)));
+  const cards = await Promise.all(matches.map(buildMatchCardEsperando));
+  cards.forEach(c=> container.appendChild(c));
 
   setText('reco-esperando-count', matches.length);
   setText('reco-esperando-stat', matches.length);
 }
 
-function renderMatchesHistorial(){
+async function renderMatchesHistorial(){
   const tbody = document.getElementById('reco-historial-body');
   if(!tbody) return;
 
-  const matches = API.matches.listByStatus(['aprobado_doctor','aprobado_admin','rechazado_doctor','rechazado_admin']);
+  const matches = await API.matches.listByStatus(['aprobado_doctor','aprobado_admin','rechazado_doctor','rechazado_admin']);
   tbody.innerHTML = '';
-  matches.forEach(m=>{
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
+  const rows = await Promise.all(matches.map(async m=>{
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+    ]);
     const aprobado = ['aprobado_doctor','aprobado_admin'].includes(m.status);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -506,35 +546,38 @@ function renderMatchesHistorial(){
       <td><span class="badge ${aprobado?'badge-green':'badge-red'}">${aprobado?'Aprobado':'Rechazado'}</span></td>
       <td>${m.sent_at ? formatDate(m.sent_at) : '—'}</td>
     `;
-    tbody.appendChild(tr);
-  });
+    return tr;
+  }));
+  rows.forEach(tr=> tbody.appendChild(tr));
 
   setText('reco-stat-aprobados', matches.filter(m=>['aprobado_doctor','aprobado_admin'].includes(m.status)).length);
 }
 
-function enviarMatchUI(matchId){ API.matches.send(matchId); refreshAll(); }
-function reenviarCorreoUI(matchId){ API.matches.resend(matchId); refreshAll(); }
-function cancelarEnvioUI(matchId){ API.matches.cancelSend(matchId); refreshAll(); }
+async function enviarMatchUI(matchId){ await API.matches.send(matchId); refreshAll(); }
+async function reenviarCorreoUI(matchId){ await API.matches.resend(matchId); refreshAll(); }
+async function cancelarEnvioUI(matchId){ await API.matches.cancelSend(matchId); refreshAll(); }
 
 // ==========================================================================
 // Panel Asignaciones
 // ==========================================================================
-function renderAsignacionesPendientes(){
+async function renderAsignacionesPendientes(){
   const container = document.getElementById('asig-pending');
   const doneMsg = document.getElementById('asig-done');
   if(!container) return;
 
-  const pendientes = API.assignments.listByStatus('pendiente');
+  const pendientes = await API.assignments.listByStatus('pendiente');
   container.innerHTML = '';
   if(doneMsg) doneMsg.style.display = pendientes.length===0 ? 'block' : 'none';
 
-  pendientes.forEach(a=>{
-    const m = API.matches.getById(a.match_id);
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
-    const ips = API.compose.ips(req.ips_id);
-    const doctorName = API.compose.doctorDisplayName(req.doctor_id);
+  const cards = await Promise.all(pendientes.map(async a=>{
+    const m = await API.matches.getById(a.match_id);
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant, ips, doctorName] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+      API.compose.ips(req.ips_id),
+      API.compose.doctorDisplayName(req.doctor_id),
+    ]);
 
     const card = document.createElement('div');
     card.className = 'match-card';
@@ -557,24 +600,29 @@ function renderAsignacionesPendientes(){
         </div>
       </div>
     `;
-    container.appendChild(card);
-  });
+    return card;
+  }));
+  cards.forEach(c=> container.appendChild(c));
 
   setText('stat-pend', pendientes.length);
 }
 
-function renderAsignacionesHistorial(){
+async function renderAsignacionesHistorial(){
   const tbody = document.getElementById('hist-body');
   if(!tbody) return;
 
-  const historial = API.assignments.list().filter(a=>a.status!=='pendiente');
+  const all = await API.assignments.list();
+  const historial = all.filter(a=>a.status!=='pendiente');
   tbody.innerHTML = '';
-  historial.forEach(a=>{
-    const m = API.matches.getById(a.match_id);
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
-    const ips = API.compose.ips(req.ips_id);
+
+  const rows = await Promise.all(historial.map(async a=>{
+    const m = await API.matches.getById(a.match_id);
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant, ips] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+      API.compose.ips(req.ips_id),
+    ]);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${patient.nombre} ${patient.apellido}</td>
@@ -582,38 +630,41 @@ function renderAsignacionesHistorial(){
       <td>${ips?ips.nombre:'—'}</td>
       <td><span class="badge ${a.status==='aprobada'?'badge-green':'badge-red'}">${a.status==='aprobada'?'Aprobada':'Rechazada'}</span></td>
     `;
-    tbody.appendChild(tr);
-  });
+    return tr;
+  }));
+  rows.forEach(tr=> tbody.appendChild(tr));
 
   setText('asig-stat-aprobadas', historial.filter(a=>a.status==='aprobada').length);
   setText('asig-stat-rechazadas', historial.filter(a=>a.status==='rechazada').length);
-  setText('asig-stat-total', API.assignments.list().length);
+  setText('asig-stat-total', all.length);
 }
 
-function aprobarAsignacionUI(assignmentId){ API.assignments.approve(assignmentId, currentUser.id); refreshAll(); }
-function rechazarAsignacionUI(assignmentId){ API.assignments.reject(assignmentId, currentUser.id, ''); refreshAll(); }
+async function aprobarAsignacionUI(assignmentId){ await API.assignments.approve(assignmentId, currentUser.id); refreshAll(); }
+async function rechazarAsignacionUI(assignmentId){ await API.assignments.reject(assignmentId, currentUser.id, ''); refreshAll(); }
 
 // ==========================================================================
 // Panel Etiquetado
 // ==========================================================================
-function renderDespachosPorEtiquetar(){
+async function renderDespachosPorEtiquetar(){
   const container = document.getElementById('etiq-pending-card');
   const doneMsg = document.getElementById('etiq-done');
   if(!container) return;
 
-  const pendientes = API.dispatches.listByStatus('por_etiquetar');
+  const pendientes = await API.dispatches.listByStatus('por_etiquetar');
   container.innerHTML = '';
   if(doneMsg) doneMsg.style.display = pendientes.length===0 ? 'block' : 'none';
 
-  pendientes.forEach(d=>{
-    const a = API.assignments.getById(d.assignment_id);
-    const m = API.matches.getById(a.match_id);
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
-    const ips = API.compose.ips(d.ips_id);
-    const donor = API.compose.donor(implant.donor_id);
-    const doctorName = API.compose.doctorDisplayName(req.doctor_id);
+  const cards = await Promise.all(pendientes.map(async d=>{
+    const a = await API.assignments.getById(d.assignment_id);
+    const m = await API.matches.getById(a.match_id);
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant, ips, doctorName] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+      API.compose.ips(d.ips_id),
+      API.compose.doctorDisplayName(req.doctor_id),
+    ]);
+    const donor = await API.compose.donor(implant.donor_id);
 
     const codigoOrden = req.codigo_visible || '—';
     const donorSexo = donor ? donor.sexo_biologico : '—';
@@ -657,29 +708,32 @@ function renderDespachosPorEtiquetar(){
         <button class="btn-tag" onclick="etiquetarDespachoUI('${d.id}')"><i class="ti ti-truck-delivery" style="font-size:13px"></i> Marcar como en camino</button>
       </div>
     `;
-    container.appendChild(card);
-  });
+    return card;
+  }));
+  cards.forEach(c=> container.appendChild(c));
 
   setText('etiq-pend', pendientes.length);
   setText('etiq-tab-count', pendientes.length);
 }
 
-function renderDespachosEnCamino(){
+async function renderDespachosEnCamino(){
   const container = document.getElementById('etiq-camino-list');
   const emptyMsg = document.getElementById('etiq-camino-vacio');
   if(!container) return;
 
-  const enCamino = API.dispatches.listByStatus('en_camino');
+  const enCamino = await API.dispatches.listByStatus('en_camino');
   container.innerHTML = '';
   if(emptyMsg) emptyMsg.style.display = enCamino.length===0 ? 'block' : 'none';
 
-  enCamino.forEach(d=>{
-    const a = API.assignments.getById(d.assignment_id);
-    const m = API.matches.getById(a.match_id);
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
-    const ips = API.compose.ips(d.ips_id);
+  const cards = await Promise.all(enCamino.map(async d=>{
+    const a = await API.assignments.getById(d.assignment_id);
+    const m = await API.matches.getById(a.match_id);
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant, ips] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+      API.compose.ips(d.ips_id),
+    ]);
 
     const card = document.createElement('div');
     card.className = 'dispatch-card';
@@ -705,26 +759,33 @@ function renderDespachosEnCamino(){
         </div>
       </div>
     `;
-    container.appendChild(card);
-  });
+    return card;
+  }));
+  cards.forEach(c=> container.appendChild(c));
 
   setText('etiq-tab-count-camino', enCamino.length);
   setText('etiq-stat-camino', enCamino.length);
 }
 
-function renderDespachosEntregados(){
+async function renderDespachosEntregados(){
   const tbody = document.getElementById('despacho-body');
   if(!tbody) return;
 
-  const entregados = API.dispatches.listByStatus('entregado');
+  const [entregados, allDispatches] = await Promise.all([
+    API.dispatches.listByStatus('entregado'),
+    API.dispatches.list(),
+  ]);
   tbody.innerHTML = '';
-  entregados.forEach(d=>{
-    const a = API.assignments.getById(d.assignment_id);
-    const m = API.matches.getById(a.match_id);
-    const req = API.requests.getById(m.request_id);
-    const patient = API.compose.patient(req.patient_id);
-    const implant = API.compose.implant(m.implant_id);
-    const ips = API.compose.ips(d.ips_id);
+
+  const rows = await Promise.all(entregados.map(async d=>{
+    const a = await API.assignments.getById(d.assignment_id);
+    const m = await API.matches.getById(a.match_id);
+    const req = await API.requests.getById(m.request_id);
+    const [patient, implant, ips] = await Promise.all([
+      API.compose.patient(req.patient_id),
+      API.compose.implant(m.implant_id),
+      API.compose.ips(d.ips_id),
+    ]);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span style="font-family:monospace;font-size:11px;background:var(--blue-faint);color:var(--blue-deep);padding:1px 7px;border-radius:4px">${req.codigo_visible || '—'}</span></td>
@@ -734,15 +795,16 @@ function renderDespachosEntregados(){
       <td>${formatDate(req.fecha_estimada_cirugia)}</td>
       <td><span class="badge badge-green">Entregado</span></td>
     `;
-    tbody.appendChild(tr);
-  });
+    return tr;
+  }));
+  rows.forEach(tr=> tbody.appendChild(tr));
 
   setText('etiq-stat-entregados', entregados.length);
-  setText('etiq-stat-total', API.dispatches.list().length);
+  setText('etiq-stat-total', allDispatches.length);
 }
 
-function etiquetarDespachoUI(dispatchId){ API.dispatches.label(dispatchId); refreshAll(); }
-function entregarDespachoUI(dispatchId){ API.dispatches.deliver(dispatchId); refreshAll(); }
+async function etiquetarDespachoUI(dispatchId){ await API.dispatches.label(dispatchId); refreshAll(); }
+async function entregarDespachoUI(dispatchId){ await API.dispatches.deliver(dispatchId); refreshAll(); }
 
 function imprimirEtiqueta(dispatchId){
   const etiquetaEl = document.getElementById('etiqueta-' + dispatchId);
@@ -771,11 +833,11 @@ function imprimirEtiqueta(dispatchId){
 // ==========================================================================
 // Panel Doctores (admin) — crear / editar / activar / desactivar cuentas
 // ==========================================================================
-function renderDoctoresAdmin(){
+async function renderDoctoresAdmin(){
   const tbody = document.getElementById('doctores-body');
   if(!tbody) return;
 
-  const doctores = API.users.listDoctors();
+  const doctores = await API.users.listDoctors();
   tbody.innerHTML = '';
   doctores.forEach(d=>{
     const tr = document.createElement('tr');
@@ -811,7 +873,7 @@ function prepararModalNuevoDoctor(){
   document.getElementById('doc-form-error').style.display = 'none';
 }
 
-function crearDoctorUI(){
+async function crearDoctorUI(){
   const requiredIds = ['doc-cedula','doc-nombre','doc-username'];
   let valid = true;
   requiredIds.forEach(id=>{
@@ -828,13 +890,21 @@ function crearDoctorUI(){
   });
   if(!valid) return;
 
-  const result = API.users.create({
-    cedula: document.getElementById('doc-cedula').value.trim(),
-    nombre: document.getElementById('doc-nombre').value.trim(),
-    telefono: Number(document.getElementById('doc-telefono').value) || null,
-    email: document.getElementById('doc-email').value.trim(),
-    username: document.getElementById('doc-username').value.trim(),
-  });
+  let result;
+  try{
+    result = await API.users.create({
+      cedula: document.getElementById('doc-cedula').value.trim(),
+      nombre: document.getElementById('doc-nombre').value.trim(),
+      telefono: Number(document.getElementById('doc-telefono').value) || null,
+      email: document.getElementById('doc-email').value.trim(),
+      username: document.getElementById('doc-username').value.trim(),
+    });
+  }catch(e){
+    const banner = document.getElementById('doc-form-error');
+    document.getElementById('doc-form-error-msg').textContent = 'No se pudo crear la cuenta. Intenta de nuevo.';
+    banner.style.display = 'flex';
+    return;
+  }
 
   if(result.error === 'USERNAME_TAKEN'){
     const banner = document.getElementById('doc-form-error');
@@ -849,8 +919,8 @@ function crearDoctorUI(){
   mostrarCredenciales(result.username, result.password);
 }
 
-function abrirEditarDoctorUI(userId){
-  const doctores = API.users.listDoctors();
+async function abrirEditarDoctorUI(userId){
+  const doctores = await API.users.listDoctors();
   const d = doctores.find(x=>x.user_id===userId);
   if(!d) return;
   document.getElementById('edit-doc-user-id').value = d.user_id;
@@ -862,7 +932,7 @@ function abrirEditarDoctorUI(userId){
   openModal('modal-editar-doctor');
 }
 
-function guardarEdicionDoctorUI(){
+async function guardarEdicionDoctorUI(){
   const userId = document.getElementById('edit-doc-user-id').value;
   const nombreEl = document.getElementById('edit-doc-nombre');
   if(!nombreEl.value.trim()){
@@ -873,7 +943,7 @@ function guardarEdicionDoctorUI(){
   nombreEl.classList.remove('invalid');
   document.getElementById('edit-doc-nombre-error').classList.remove('show');
 
-  API.users.updateProfile(userId, {
+  await API.users.updateProfile(userId, {
     nombre: nombreEl.value.trim(),
     telefono: Number(document.getElementById('edit-doc-telefono').value) || null,
     email: document.getElementById('edit-doc-email').value.trim(),
@@ -883,13 +953,13 @@ function guardarEdicionDoctorUI(){
   refreshAll();
 }
 
-function toggleActivoDoctorUI(userId, currentlyActive){
-  API.users.setActive(userId, !currentlyActive);
+async function toggleActivoDoctorUI(userId, currentlyActive){
+  await API.users.setActive(userId, !currentlyActive);
   refreshAll();
 }
 
-function resetPasswordUI(userId){
-  const result = API.users.resetPassword(userId);
+async function resetPasswordUI(userId){
+  const result = await API.users.resetPassword(userId);
   if(!result) return;
   closeModal('modal-editar-doctor');
   mostrarCredenciales(result.username, result.password);
@@ -910,9 +980,9 @@ function copiarCredencial(inputId){
 // ==========================================================================
 // Panel Mi perfil (doctor_profile)
 // ==========================================================================
-function renderPerfilDoctor(){
+async function renderPerfilDoctor(){
   if(!currentUser || currentUser.role !== 'doctor') return;
-  const profile = API.doctorProfile.getByUserId(currentUser.id);
+  const profile = await API.doctorProfile.getByUserId(currentUser.id);
   if(!profile) return;
   document.getElementById('perfil-id').value = profile.id;
   document.getElementById('perfil-nombre').value = profile.nombre;
@@ -920,7 +990,7 @@ function renderPerfilDoctor(){
   document.getElementById('perfil-email').value = profile.email || '';
 }
 
-function guardarPerfilDoctor(){
+async function guardarPerfilDoctor(){
   const requiredIds = ['perfil-id','perfil-nombre'];
   let valid = true;
   requiredIds.forEach(id=>{
@@ -930,7 +1000,7 @@ function guardarPerfilDoctor(){
   });
   if(!valid) return;
 
-  API.doctorProfile.update(currentUser.id, {
+  await API.doctorProfile.update(currentUser.id, {
     nombre: document.getElementById('perfil-nombre').value.trim(),
     telefono: Number(document.getElementById('perfil-telefono').value) || null,
     email: document.getElementById('perfil-email').value.trim(),
@@ -973,7 +1043,7 @@ function validarSolicitud(){
   return valid;
 }
 
-function enviarSolicitud(){
+async function enviarSolicitud(){
   if(!validarSolicitud()){
     const banner = document.getElementById('sol-form-error');
     banner.style.display = 'flex';
@@ -983,9 +1053,9 @@ function enviarSolicitud(){
   document.getElementById('sol-form-error').style.display = 'none';
 
   const ipsNombre = document.getElementById('sol-ips-nombre').value.trim();
-  let ips = API.ips.findByName(ipsNombre);
+  let ips = await API.ips.findByName(ipsNombre);
   if(!ips){
-    ips = API.ips.create({
+    ips = await API.ips.create({
       nombre: ipsNombre,
       direccion: document.getElementById('sol-ips-direccion').value.trim(),
       telefono: document.getElementById('sol-ips-telefono').value.trim(),
@@ -995,7 +1065,7 @@ function enviarSolicitud(){
 
   const sexoNoImportante = document.getElementById('sol-sexo-no-importante')?.checked || false;
 
-  const patient = API.patients.create({
+  const patient = await API.patients.create({
     tipo_identificacion: document.getElementById('sol-tipo-identificacion').value,
     nombre: document.getElementById('sol-nombre').value.trim(),
     apellido: document.getElementById('sol-apellido').value.trim(),
@@ -1005,7 +1075,7 @@ function enviarSolicitud(){
     sexo_biologico: document.getElementById('sol-sexo-biologico')?.value || null,
   });
 
-  API.requests.create({
+  await API.requests.create({
     patient_id: patient.id,
     doctor_id: currentUser.id,
     ips_id: ips.id,
@@ -1211,7 +1281,7 @@ function previsualizarFotoImplante(input){
   if(hint) hint.textContent = 'Simulado en el navegador — en producción esto sube a un bucket S3 y guarda la URL real.';
 }
 
-function guardarDonanteEImplantes(){
+async function guardarDonanteEImplantes(){
   const requiredDonorIds = ['donante-codigo','donante-fecha-extraccion','donante-fecha-vencimiento'];
   let valid = true;
   requiredDonorIds.forEach(id=>{
@@ -1221,7 +1291,7 @@ function guardarDonanteEImplantes(){
   });
   if(!valid) return;
 
-  const donor = API.donors.create({
+  const donor = await API.donors.create({
     codigo_donante: document.getElementById('donante-codigo').value.trim(),
     fecha_extraccion: document.getElementById('donante-fecha-extraccion').value,
     fecha_procedimiento: document.getElementById('donante-fecha-procedimiento').value || null,
@@ -1229,7 +1299,7 @@ function guardarDonanteEImplantes(){
     fecha_vencimiento: document.getElementById('donante-fecha-vencimiento').value,
   });
 
-  implantesPendientes.forEach(implante=> API.implants.create(donor.id, implante));
+  await Promise.all(implantesPendientes.map(implante=> API.implants.create(donor.id, implante)));
 
   closeModal('modal-nuevo-tejido');
   refreshAll();
@@ -1238,10 +1308,10 @@ function guardarDonanteEImplantes(){
 // ==========================================================================
 // Modales de detalle (Tejidos / Solicitantes) — leen directo de la API
 // ==========================================================================
-function abrirDetalleImplante(implantId){
-  const implant = API.implants.getById(implantId);
+async function abrirDetalleImplante(implantId){
+  const implant = await API.implants.getById(implantId);
   if(!implant) return;
-  const donor = API.compose.donor(implant.donor_id);
+  const donor = await API.compose.donor(implant.donor_id);
   const estadoInfo = ESTADO_LABELS[implant.estado] || ESTADO_LABELS.disponible;
   const expiring = donor ? (daysUntil(donor.fecha_vencimiento) <= 7 && daysUntil(donor.fecha_vencimiento) >= 0) : false;
 
@@ -1266,13 +1336,15 @@ function abrirDetalleImplante(implantId){
   openModal('modal-detalle-implante');
 }
 
-function abrirDetalleSolicitud(requestId){
-  const req = API.requests.getById(requestId);
+async function abrirDetalleSolicitud(requestId){
+  const req = await API.requests.getById(requestId);
   if(!req) return;
-  const patient = API.compose.patient(req.patient_id);
-  const ips = API.compose.ips(req.ips_id);
-  const doctorName = API.compose.doctorDisplayName(req.doctor_id);
-  const statusInfo = API.requests.getStatusLabel(req.id);
+  const [patient, ips, doctorName, statusInfo] = await Promise.all([
+    API.compose.patient(req.patient_id),
+    API.compose.ips(req.ips_id),
+    API.compose.doctorDisplayName(req.doctor_id),
+    API.requests.getStatusLabel(req.id),
+  ]);
 
   setText('det-sol-titulo', patient ? patient.nombre+' '+patient.apellido : 'Solicitud');
   setText('det-sol-codigo', req.codigo_visible || '');
@@ -1296,11 +1368,13 @@ function abrirDetalleSolicitud(requestId){
 // ==========================================================================
 // Panel Solicitantes — Matches por aprobar (doctor)
 // ==========================================================================
-function buildMatchCardDoctor(m){
-  const req     = API.requests.getById(m.request_id);
-  const patient = API.compose.patient(req.patient_id);
-  const implant = API.compose.implant(m.implant_id);
-  const ips     = API.compose.ips(req.ips_id);
+async function buildMatchCardDoctor(m){
+  const req = await API.requests.getById(m.request_id);
+  const [patient, implant, ips] = await Promise.all([
+    API.compose.patient(req.patient_id),
+    API.compose.implant(m.implant_id),
+    API.compose.ips(req.ips_id),
+  ]);
   const scoreClass = m.compatibility_score >= 85 ? '' : (m.compatibility_score >= 70 ? 'mid' : 'low');
 
   const card = document.createElement('div');
@@ -1366,15 +1440,19 @@ function buildMatchCardDoctor(m){
   return card;
 }
 
-function renderMatchesPorAprobarDoctor(){
+async function renderMatchesPorAprobarDoctor(){
   const container = document.getElementById('doctor-matches-list');
   const emptyMsg  = document.getElementById('doctor-matches-empty');
   const badge     = document.getElementById('doctor-matches-badge');
   if(!container || !currentUser) return;
 
   // Solo matches enviados que correspondan a solicitudes del doctor actual
-  const misSolIds = API.requests.listByDoctor(currentUser.id).map(r => r.id);
-  const mis = API.matches.listByStatus(['enviado']).filter(m => misSolIds.includes(m.request_id));
+  const [misSol, allEnviados] = await Promise.all([
+    API.requests.listByDoctor(currentUser.id),
+    API.matches.listByStatus(['enviado']),
+  ]);
+  const misSolIds = misSol.map(r => r.id);
+  const mis = allEnviados.filter(m => misSolIds.includes(m.request_id));
 
   container.innerHTML = '';
   const count = mis.length;
@@ -1384,40 +1462,46 @@ function renderMatchesPorAprobarDoctor(){
     badge.style.display = count > 0 ? 'inline-block' : 'none';
   }
   setText('sol-stat-match-pendiente', count);
-  mis.forEach(m => container.appendChild(buildMatchCardDoctor(m)));
+  const cards = await Promise.all(mis.map(buildMatchCardDoctor));
+  cards.forEach(c => container.appendChild(c));
 }
 
-function aprobarMatchDoctorUI(matchId){
-  API.matches.approveDoctor(matchId, currentUser.id);
+async function aprobarMatchDoctorUI(matchId){
+  await API.matches.approveDoctor(matchId, currentUser.id);
   refreshAll();
 }
 
-function rechazarMatchDoctorUI(matchId){
-  API.matches.rejectDoctor(matchId, currentUser.id, 'Rechazado por el médico');
+async function rechazarMatchDoctorUI(matchId){
+  await API.matches.rejectDoctor(matchId, currentUser.id, 'Rechazado por el médico');
   refreshAll();
 }
 
 // ==========================================================================
 // Refresco maestro — se llama tras login y tras cualquier mutación
 // ==========================================================================
-function refreshAll(){
+async function refreshAll(){
   if(!currentUser) return;
-  renderMisSolicitudes();
-  renderMatchesPorAprobarDoctor();
-  renderTodasSolicitudes();
-  renderInventarioTejidos();
-  renderPorVencerTejidos();
-  renderHistorialDonantes();
-  renderMatchesPendientes();
-  renderMatchesEsperando();
-  renderMatchesHistorial();
-  renderAsignacionesPendientes();
-  renderAsignacionesHistorial();
-  renderDespachosPorEtiquetar();
-  renderDespachosEnCamino();
-  renderDespachosEntregados();
-  renderPerfilDoctor();
-  renderDoctoresAdmin();
+  // Cada render* toca una parte distinta e independiente del DOM, así que
+  // se disparan en paralelo en vez de esperarlas una por una — evita una
+  // cascada secuencial de ~16 rondas de red cada vez que se refresca todo.
+  await Promise.all([
+    renderMisSolicitudes(),
+    renderMatchesPorAprobarDoctor(),
+    renderTodasSolicitudes(),
+    renderInventarioTejidos(),
+    renderPorVencerTejidos(),
+    renderHistorialDonantes(),
+    renderMatchesPendientes(),
+    renderMatchesEsperando(),
+    renderMatchesHistorial(),
+    renderAsignacionesPendientes(),
+    renderAsignacionesHistorial(),
+    renderDespachosPorEtiquetar(),
+    renderDespachosEnCamino(),
+    renderDespachosEntregados(),
+    renderPerfilDoctor(),
+    renderDoctoresAdmin(),
+  ]);
 }
 
 // ---- Reloj en la topbar -----------------------------------------------------

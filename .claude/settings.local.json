@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check App.js)",
+      "Bash(node --check Data.js)",
+      "Bash(curl -s -i -X POST https://dml5behlp3.execute-api.us-east-1.amazonaws.com/auth/login -H 'Content-Type: application/json' -H 'Origin: http://localhost:5500' -d '{\"username\":\"test\",\"password\":\"test\"}' --max-time 10)",
+      "Bash(curl -s -i -X OPTIONS https://dml5behlp3.execute-api.us-east-1.amazonaws.com/auth/login -H 'Origin: http://localhost:5500' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type' --max-time 10)",
+      "Bash(curl -s -i -X OPTIONS https://dml5behlp3.execute-api.us-east-1.amazonaws.com/doctors -H 'Origin: http://localhost:5500' -H 'Access-Control-Request-Method: GET' --max-time 10)",
+      "Bash(curl -s -i -X OPTIONS https://dml5behlp3.execute-api.us-east-1.amazonaws.com/requests -H 'Origin: http://localhost:5500' -H 'Access-Control-Request-Method: GET' --max-time 10)"
+    ]
+  }
+}
