@@ -377,7 +377,12 @@
             <button class="info-btn" onclick="openModal('info-recomendaciones')" aria-label="Información del panel"><i class="ti ti-info-circle"></i></button>
           </div>
         </div>
+        <button class="btn-primary" id="btn-ejecutar-matching" onclick="ejecutarMotorMatchingUI()">
+          <i class="ti ti-refresh" style="font-size:13px"></i> Ejecutar motor de matching
+        </button>
       </div>
+
+      <div id="matching-run-result" style="display:none;font-size:11.5px;margin:-6px 0 14px;padding:9px 12px;border-radius:8px"></div>
 
       <div class="stats-row">
         <div class="stat"><div class="stat-num" id="reco-stat-detectados">—</div><div class="stat-lbl">Matches detectados</div></div>

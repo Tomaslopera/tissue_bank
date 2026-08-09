@@ -497,6 +497,24 @@ const API = {
       if(reason) body.rejection_reason = reason;
       return put('/matches/' + matchId + '/doctor-response', body);
     },
+    // Dispara el motor de matching en el backend, que busca implantes
+    // compatibles para las solicitudes en fila y crea los `match` nuevos.
+    // Forma de la respuesta no documentada — se toleran varios alias, incluido
+    // el wrapper { data: {...} } que se ve en otras rutas (ver unwrapList).
+    // Si ninguno calza, created/processed quedan en 0 solo para el mensaje
+    // en pantalla — el refresco del panel NO depende de acertar este campo
+    // (ver ejecutarMotorMatchingUI en app.js), porque adivinar mal el nombre
+    // no debe dejar la pantalla desactualizada.
+    async run(){
+      const res = await post('/matches/run');
+      const body = (res && typeof res === 'object' && res.data && typeof res.data === 'object') ? res.data : res;
+      const created = body?.created ?? body?.matches_created ?? body?.created_count
+        ?? (Array.isArray(body?.matches) ? body.matches.length : undefined)
+        ?? (Array.isArray(body) ? body.length : undefined)
+        ?? 0;
+      const processed = body?.processed ?? body?.requests_processed ?? body?.processed_count ?? 0;
+      return { created, processed, raw: res };
+    },
   },
 
   assignments: {

@@ -477,6 +477,21 @@ function buildCompatRow(label, requestVal, percent, implantVal){
   </div>`;
 }
 
+function buildDonorInfoBlock(donor){
+  if(!donor) return '';
+  const days = daysUntil(donor.fecha_vencimiento);
+  const diasDetail = days < 0 ? 'Vencido' : `${days} día${days===1?'':'s'} restantes`;
+  const diasColor = days <= 7 ? 'var(--rust-deep)' : 'var(--ink-dark)';
+  const sexo = donor.sexo_biologico === 'M' ? 'Masculino' : donor.sexo_biologico === 'F' ? 'Femenino' : '—';
+  return `
+    <div class="compat-block" style="margin-top:10px">
+      <div class="compat-title">Información del donante</div>
+      <div class="etiqueta-row"><span class="etiqueta-lbl">Vencimiento del tejido</span><span class="etiqueta-val" style="color:${diasColor}">${diasDetail}</span></div>
+      <div class="etiqueta-row"><span class="etiqueta-lbl">Sexo del donante</span><span class="etiqueta-val">${sexo}</span></div>
+    </div>
+  `;
+}
+
 async function buildMatchCardPendiente(m){
   const req = await API.requests.getById(m.request_id);
   const [patient, implant, doctorName] = await Promise.all([
@@ -484,6 +499,7 @@ async function buildMatchCardPendiente(m){
     API.compose.implant(m.implant_id),
     API.compose.doctorDisplayName(req.doctor_id),
   ]);
+  const donor = await API.compose.donor(implant.donor_id);
   const scoreClass = m.compatibility_score>=85 ? '' : (m.compatibility_score>=70 ? 'mid' : 'low');
 
   const card = document.createElement('div');
@@ -508,12 +524,12 @@ async function buildMatchCardPendiente(m){
         <div class="compat-title">Compatibilidad dimensional</div>
         ${buildCompatRow('Alto', req.alto_requerido, m.compatibility_alto, implant.alto)}
         ${buildCompatRow('Ancho', req.ancho_requerido, m.compatibility_ancho, implant.ancho)}
-        ${buildCompatRow('Profundidad', req.profundidad_requerida, m.compatibility_profundidad)}
         <div class="compat-summary">
           <span class="compat-summary-label">Compatibilidad general</span>
           <span class="badge badge-green badge-lg">${m.compatibility_score>=85?'Alta':'Media'} — ${Math.round(m.compatibility_score)}%</span>
         </div>
       </div>
+      ${buildDonorInfoBlock(donor)}
       <div class="match-footer" style="border-top:none;margin-top:14px;padding-top:0">
         <span style="font-size:11px;color:var(--ink-faint)">Se notificará por correo al doctor solicitante</span>
         <button class="btn-send" onclick="event.stopPropagation(); enviarMatchUI('${m.id}')"><i class="ti ti-send" style="font-size:13px"></i> Enviar match al doctor</button>
@@ -635,6 +651,47 @@ async function renderMatchesHistorial(){
 async function enviarMatchUI(matchId){ await API.matches.send(matchId); refreshAll(); }
 async function reenviarCorreoUI(matchId){ await API.matches.resend(matchId); refreshAll(); }
 async function cancelarEnvioUI(matchId){ await API.matches.cancelSend(matchId); refreshAll(); }
+
+async function ejecutarMotorMatchingUI(){
+  const btn = document.getElementById('btn-ejecutar-matching');
+  const resultEl = document.getElementById('matching-run-result');
+  if(!btn) return;
+
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader-2 spin" style="font-size:13px"></i> Ejecutando…';
+  if(resultEl){
+    resultEl.style.display = 'block';
+    resultEl.style.background = 'var(--teal-soft)';
+    resultEl.style.color = 'var(--teal-deep)';
+    resultEl.textContent = 'Buscando implantes compatibles para las solicitudes en fila…';
+  }
+
+  try{
+    const { created, processed } = await API.matches.run();
+    if(resultEl){
+      resultEl.style.background = created > 0 ? 'var(--teal-soft)' : 'var(--rust-soft)';
+      resultEl.style.color = created > 0 ? 'var(--teal-deep)' : 'var(--rust-deep)';
+      resultEl.textContent = `Motor de matching ejecutado: ${created} match${created===1?'':'es'} nuevo${created===1?'':'s'} creado${created===1?'':'s'} a partir de ${processed} solicitud${processed===1?'':'es'} procesada${processed===1?'':'s'}.`;
+    }
+    // No condicionar el refresco a `created > 0`: la forma exacta de la
+    // respuesta de /matches/run no está documentada, así que ese número
+    // puede quedar en 0 aunque el backend sí haya creado matches — refrescar
+    // siempre evita que el panel quede desactualizado por una mala lectura
+    // del payload (es una llamada barata, ya la hace refreshAll() en todos
+    // lados).
+    await refreshAll();
+  }catch(e){
+    if(resultEl){
+      resultEl.style.background = 'var(--rust-soft)';
+      resultEl.style.color = 'var(--rust-deep)';
+      resultEl.textContent = 'No se pudo ejecutar el motor de matching: ' + e.message;
+    }
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
 
 // ==========================================================================
 // Panel Asignaciones
@@ -1698,6 +1755,7 @@ async function buildMatchCardDoctor(m){
     API.compose.implant(m.implant_id),
     API.compose.ips(req.ips_id),
   ]);
+  const donor = implant ? await API.compose.donor(implant.donor_id) : null;
   const scoreClass = m.compatibility_score >= 85 ? '' : (m.compatibility_score >= 70 ? 'mid' : 'low');
 
   const card = document.createElement('div');
@@ -1727,7 +1785,6 @@ async function buildMatchCardDoctor(m){
         <div class="compat-title">Compatibilidad dimensional</div>
         ${buildCompatRow('Alto',        req.alto_requerido,        m.compatibility_alto,         implant ? implant.alto  : null)}
         ${buildCompatRow('Ancho',       req.ancho_requerido,       m.compatibility_ancho,        implant ? implant.ancho : null)}
-        ${buildCompatRow('Profundidad', req.profundidad_requerida, m.compatibility_profundidad)}
         <div class="compat-summary">
           <span class="compat-summary-label">Compatibilidad general</span>
           <span class="badge ${m.compatibility_score >= 85 ? 'badge-green' : 'badge-amber'} badge-lg">
@@ -1735,6 +1792,7 @@ async function buildMatchCardDoctor(m){
           </span>
         </div>
       </div>
+      ${buildDonorInfoBlock(donor)}
       ${implant && implant.url_imagen ? `
         <div style="margin-top:12px">
           <div style="font-size:11px;color:var(--ink-faint);margin-bottom:6px;
