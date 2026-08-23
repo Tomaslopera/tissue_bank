@@ -18,8 +18,8 @@ TissueBank es una empresa colombiana dedicada a la distribución de tejidos orto
 
 El repo contiene tres piezas que hoy conviven en distinto grado de madurez:
 
-- **Frontend** (`Index.html`, `App.js`, `Data.js`, `Styles.css`) — funciona hoy como demo autocontenida: `Data.js` simula el backend completo en memoria (`window.DB` + `window.API`), sin llamadas de red. Está diseñado para que, cuando el backend quede conectado, solo cambien los *bodies* de los métodos de `API` (array en memoria → `fetch()` contra API Gateway), sin tocar `App.js`.
-- **Backend** (`lambdas/`) — funciones Lambda en Python que implementan esos mismos endpoints contra Supabase. Ver detalle abajo.
+- **Frontend** (`Index.html`, `App.js`, `Data.js`, `Styles.css`) — `Data.js` expone `window.API` como cliente real de la API (antes era una simulación en memoria; ese contrato de nombres/parámetros se mantuvo igual para no tocar `App.js`, que solo consume `API.*` con `await`).
+- **Backend** (`lambdas/`) — funciones Lambda en Python que implementan esos endpoints contra Supabase. Ver detalle abajo.
 - **Esquema** (`Schema.sql`) — el esquema real de Postgres/Supabase, ya usado por las Lambdas.
 
 > Nota: `docs/Architecture.png` es una **propuesta de arquitectura objetivo** (CloudFront + S3 + RDS delante del backend), no lo que está desplegado hoy. El MVP actual es más simple: el frontend se sirve directo desde **Netlify** (sin CloudFront/S3 propios) y la base de datos es **Supabase**, sin RDS. Ver `docs/Overview.md` para el detalle del stack realmente en uso.
@@ -39,7 +39,7 @@ Definida en `Schema.sql`. Tablas principales, con integridad referencial complet
 - `assignment` — aprobación de la asignación
 - `dispatch` — gestión del despacho físico
 
-Además incluye las vistas `v_request_status` y `v_request_pipeline`, que derivan el estado de una solicitud recorriendo `match → assignment → dispatch` (misma lógica replicada en `getRequestStatus()` de `Data.js` para la demo).
+Además incluye las vistas `v_request_status` y `v_request_pipeline`, que derivan el estado de una solicitud recorriendo `match → assignment → dispatch` (mismo criterio que expone el endpoint `GET /requests/{id}/status`).
 
 ## Backend (`lambdas/`)
 
@@ -75,6 +75,53 @@ DB_PORT=6543
 DB_USER=postgres.your-project-ref
 JWT_SECRET=your-jwt-secret
 ```
+
+## API
+
+Base URL (API Gateway, HTTP API):
+
+```
+https://dml5behlp3.execute-api.us-east-1.amazonaws.com
+```
+
+Autenticación: header `Authorization: Bearer <token>` (JWT emitido por `/auth/login`, expira en 72h). Todas las rutas requieren sesión salvo `/auth/login`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/login` | Login, devuelve JWT |
+| GET | `/doctors` | Listar doctores |
+| GET | `/doctors/{id}` | Ver doctor |
+| POST | `/doctors` | Crear doctor (devuelve password temporal) |
+| PUT | `/doctors/{id}` | Actualizar perfil del doctor |
+| PATCH | `/doctors/{id}/status` | Activar/desactivar doctor |
+| POST | `/doctors/{id}/reset-password` | Resetear password (devuelve nueva temporal) |
+| GET | `/ips` | Listar IPS |
+| POST | `/ips` | Crear IPS |
+| GET | `/patients?search=` | Buscar paciente por número de identificación |
+| POST | `/patients` | Crear paciente |
+| GET | `/donors` | Listar donantes |
+| GET | `/donors/{id}` | Ver donante |
+| POST | `/donors` | Crear donante |
+| PUT | `/donors/{id}` | Actualizar donante |
+| GET | `/implants` | Listar implantes |
+| GET | `/implants/{id}` | Ver implante |
+| POST | `/implants` | Crear implante |
+| PUT | `/implants/{id}` | Actualizar implante |
+| GET | `/requests` | Listar solicitudes |
+| GET | `/requests/{id}/status` | Estado derivado del pipeline de la solicitud |
+| POST | `/requests` | Crear solicitud |
+| GET | `/matches` | Listar matches (filtro opcional `?status=`) |
+| POST | `/matches/run` | Ejecutar motor de matching |
+| POST | `/matches/{id}/send` | Enviar match al doctor |
+| POST | `/matches/{id}/cancel` | Cancelar envío |
+| POST | `/matches/{id}/resend` | Reenviar notificación |
+| PUT | `/matches/{id}/doctor-response` | Registrar aprobación/rechazo del doctor |
+| GET | `/assignments` | Listar asignaciones |
+| PUT | `/assignments/{id}/approve` | Aprobar asignación (crea el despacho) |
+| PUT | `/assignments/{id}/reject` | Rechazar asignación |
+| GET | `/dispatches` | Listar despachos |
+| PUT | `/dispatches/{id}/label` | Etiquetar despacho |
+| PUT | `/dispatches/{id}/deliver` | Marcar despacho como entregado |
 
 ## Roles de usuario
 
@@ -119,11 +166,7 @@ Filtros obligatorios: tipo de tejido exacto, dimensiones dentro de ±5mm, sexo d
 
 ## Correr el frontend localmente
 
-No hay build step ni dependencias. Simplemente abre `Index.html` en un navegador, o sírvelo como archivos estáticos:
-
-```bash
-python3 -m http.server
-```
+No hay build step ni dependencias. Basta con abrir `Index.html` con la extensión **Live Server** de VS Code (clic derecho → "Open with Live Server"). El frontend apunta directo al API Gateway real (`API_BASE` en `Data.js`), así que localmente ya se trabaja contra los datos de Supabase — no hace falta levantar backend.
 
 ⚠️ Los archivos están nombrados en mayúscula (`Index.html`, `App.js`, `Data.js`, `Styles.css`) pero `Index.html` los referencia en minúscula. Esto funciona en macOS/Windows (filesystem case-insensitive) pero falla en Linux o en hosts que distingan mayúsculas/minúsculas.
 
