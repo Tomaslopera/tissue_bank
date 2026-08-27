@@ -611,11 +611,11 @@
       <div class="form-row three">
         <div class="form-group">
           <label class="form-label">Fecha de nacimiento</label>
-          <input class="form-input" type="date" id="sol-fecha-nac" value=""/>
+          <input class="form-input" type="date" id="sol-fecha-nac" value="" oninput="actualizarEdadSolicitud()"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Edad</label>
-          <input class="form-input" type="number" id="sol-edad" value="" placeholder="Ej: 40"/>
+          <label class="form-label">Edad (calculada)</label>
+          <input class="form-input" type="number" id="sol-edad" value="" placeholder="Se calcula desde la fecha de nacimiento" readonly/>
         </div>
         <div class="form-group">
           <label class="form-label">Nacionalidad</label>
@@ -670,7 +670,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Tejido solicitado <span class="req">*</span></label>
-          <input class="form-input" id="sol-tejido-tipo" value="" placeholder="Ej: Piel, Hueso..."/>
+          <input class="form-input" id="sol-tejido-tipo" value="" maxlength="300" placeholder="Ej: Piel, Hueso..."/>
           <span class="field-error" id="sol-tejido-tipo-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group">
@@ -687,17 +687,17 @@
       </div>
       <div class="form-row three">
         <div class="form-group">
-          <label class="form-label">Alto requerido (mm) <span class="req">*</span></label>
+          <label class="form-label">Altura requerida (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="sol-alto" value="" placeholder="mm"/>
           <span class="field-error" id="sol-alto-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Ancho requerido (mm) <span class="req">*</span></label>
+          <label class="form-label">Ancho — Transversal requerido (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="sol-ancho" value="" placeholder="mm"/>
           <span class="field-error" id="sol-ancho-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Profundidad requerida (mm) <span class="req">*</span></label>
+          <label class="form-label">AP — Anteroposterior requerido (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="sol-prof" value="" placeholder="mm"/>
           <span class="field-error" id="sol-prof-error">Este campo es obligatorio</span>
         </div>
@@ -746,7 +746,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de extracción</label>
-          <input class="form-input" type="date" id="donante-fecha-extraccion" value=""/>
+          <input class="form-input" type="date" id="donante-fecha-extraccion" value="" oninput="actualizarFechaVencimientoDonante()"/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de procesamiento</label>
@@ -759,8 +759,8 @@
           <input class="form-input" type="date" id="donante-fecha-segundo-cambio" value=""/>
         </div>
         <div class="form-group">
-          <label class="form-label">Fecha de vencimiento</label>
-          <input class="form-input" type="date" id="donante-fecha-vencimiento" value=""/>
+          <label class="form-label">Fecha de vencimiento (14 días desde extracción)</label>
+          <input class="form-input" type="date" id="donante-fecha-vencimiento" value="" readonly/>
         </div>
         <div class="form-group">
           <label class="form-label">Sexo biológico del donante <span class="req">*</span></label>
@@ -816,33 +816,31 @@
           </div>
           <div class="form-group">
             <label class="form-label">Tipo de implante <span class="req">*</span></label>
-            <select class="form-input" id="implant-tipo-implante">
+            <select class="form-input" id="implant-tipo-implante" onchange="manejarCambioTipoImplante(this)">
               <option value="">Seleccionar...</option>
-              <option>Cóndilo</option>
-              <option>Patela</option>
-              <option>Plato tibial</option>
-              <option>Fémur</option>
-              <option>Talo</option>
-              <option>Menisco medial</option>
-              <option>Menisco lateral</option>
-              <option>Piel</option>
-              <option>Hueso</option>
-              <option>Otro</option>
+              <option value="__nuevo__">+ Agregar nuevo tipo...</option>
             </select>
             <span class="field-error" id="implant-tipo-implante-error">Este campo es obligatorio</span>
           </div>
         </div>
         <div class="form-row three">
           <div class="form-group">
-            <label class="form-label">Alto (mm) <span class="req">*</span></label>
+            <label class="form-label">Altura (mm) <span class="req">*</span></label>
             <input class="form-input" type="number" id="implant-alto" value=""/>
             <span class="field-error" id="implant-alto-error">Este campo es obligatorio</span>
           </div>
           <div class="form-group">
-            <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+            <label class="form-label">Ancho — Transversal (mm) <span class="req">*</span></label>
             <input class="form-input" type="number" id="implant-ancho" value=""/>
             <span class="field-error" id="implant-ancho-error">Este campo es obligatorio</span>
           </div>
+          <div class="form-group">
+            <label class="form-label">AP — Anteroposterior (mm) <span class="req">*</span></label>
+            <input class="form-input" type="number" id="implant-profundidad" value=""/>
+            <span class="field-error" id="implant-profundidad-error">Este campo es obligatorio</span>
+          </div>
+        </div>
+        <div class="form-row">
           <div class="form-group">
             <label class="form-label">Estado</label>
             <select class="form-input" id="implant-estado">
@@ -976,33 +974,31 @@
         </div>
         <div class="form-group">
           <label class="form-label">Tipo de implante <span class="req">*</span></label>
-          <select class="form-input" id="edit-implant-tipo-implante">
+          <select class="form-input" id="edit-implant-tipo-implante" onchange="manejarCambioTipoImplante(this)">
             <option value="">Seleccionar...</option>
-            <option>Cóndilo</option>
-            <option>Patela</option>
-            <option>Plato tibial</option>
-            <option>Fémur</option>
-            <option>Talo</option>
-            <option>Menisco medial</option>
-            <option>Menisco lateral</option>
-            <option>Piel</option>
-            <option>Hueso</option>
-            <option>Otro</option>
+            <option value="__nuevo__">+ Agregar nuevo tipo...</option>
           </select>
           <span class="field-error" id="edit-implant-tipo-implante-error">Este campo es obligatorio</span>
         </div>
       </div>
       <div class="form-row three">
         <div class="form-group">
-          <label class="form-label">Alto (mm) <span class="req">*</span></label>
+          <label class="form-label">Altura (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="edit-implant-alto"/>
           <span class="field-error" id="edit-implant-alto-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+          <label class="form-label">Ancho — Transversal (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="edit-implant-ancho"/>
           <span class="field-error" id="edit-implant-ancho-error">Este campo es obligatorio</span>
         </div>
+        <div class="form-group">
+          <label class="form-label">AP — Anteroposterior (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="edit-implant-profundidad"/>
+          <span class="field-error" id="edit-implant-profundidad-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Estado</label>
           <select class="form-input" id="edit-implant-estado">
@@ -1051,7 +1047,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de extracción</label>
-          <input class="form-input" type="date" id="edit-donante-fecha-extraccion"/>
+          <input class="form-input" type="date" id="edit-donante-fecha-extraccion" oninput="actualizarFechaVencimientoEditDonante()"/>
         </div>
         <div class="form-group">
           <label class="form-label">Fecha de procesamiento</label>
@@ -1064,8 +1060,8 @@
           <input class="form-input" type="date" id="edit-donante-fecha-segundo-cambio"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Fecha de vencimiento</label>
-          <input class="form-input" type="date" id="edit-donante-fecha-vencimiento"/>
+          <label class="form-label">Fecha de vencimiento (14 días desde extracción)</label>
+          <input class="form-input" type="date" id="edit-donante-fecha-vencimiento" readonly/>
         </div>
         <div class="form-group">
           <label class="form-label">Sexo biológico</label>
@@ -1125,33 +1121,31 @@
         </div>
         <div class="form-group">
           <label class="form-label">Tipo de implante <span class="req">*</span></label>
-          <select class="form-input" id="agregar-implante-tipo-implante">
+          <select class="form-input" id="agregar-implante-tipo-implante" onchange="manejarCambioTipoImplante(this)">
             <option value="">Seleccionar...</option>
-            <option>Cóndilo</option>
-            <option>Patela</option>
-            <option>Plato tibial</option>
-            <option>Fémur</option>
-            <option>Talo</option>
-            <option>Menisco medial</option>
-            <option>Menisco lateral</option>
-            <option>Piel</option>
-            <option>Hueso</option>
-            <option>Otro</option>
+            <option value="__nuevo__">+ Agregar nuevo tipo...</option>
           </select>
           <span class="field-error" id="agregar-implante-tipo-implante-error">Este campo es obligatorio</span>
         </div>
       </div>
       <div class="form-row three">
         <div class="form-group">
-          <label class="form-label">Alto (mm) <span class="req">*</span></label>
+          <label class="form-label">Altura (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="agregar-implante-alto"/>
           <span class="field-error" id="agregar-implante-alto-error">Este campo es obligatorio</span>
         </div>
         <div class="form-group">
-          <label class="form-label">Ancho (mm) <span class="req">*</span></label>
+          <label class="form-label">Ancho — Transversal (mm) <span class="req">*</span></label>
           <input class="form-input" type="number" id="agregar-implante-ancho"/>
           <span class="field-error" id="agregar-implante-ancho-error">Este campo es obligatorio</span>
         </div>
+        <div class="form-group">
+          <label class="form-label">AP — Anteroposterior (mm) <span class="req">*</span></label>
+          <input class="form-input" type="number" id="agregar-implante-profundidad"/>
+          <span class="field-error" id="agregar-implante-profundidad-error">Este campo es obligatorio</span>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Estado</label>
           <select class="form-input" id="agregar-implante-estado">

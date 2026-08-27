@@ -86,18 +86,41 @@ CREATE TABLE donor (
 );
 
 -- ============================================================================
+-- 5b. tissue_type
+--    Catálogo de "Tipo de implante" (antes una lista fija en el HTML:
+--    Cóndilo, Patela, Plato tibial, ... + "Otro"). Se saca a tabla para que
+--    el admin pueda agregar tipos nuevos desde el Panel Tejidos y queden
+--    disponibles para todos, en vez de estar hardcodeados en el frontend.
+-- ============================================================================
+CREATE TABLE tissue_type (
+    id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nombre  VARCHAR(200) NOT NULL UNIQUE
+);
+
+-- ============================================================================
 -- 6. implant
---    + codigo_visible: código legible del implante (ej. TEJ-2026-001).
---      Aparece en correos al doctor, etiquetas de despacho y en el panel.
+--    + codigo_visible: código legible del implante (ej. TEJ-2026-001). Es el
+--      identificador que debe distinguir cada unidad en el Panel Tejidos —
+--      tipo_implante/parte_cuerpo se repiten entre implantes (ej. varias
+--      "Patela"), pero codigo_visible es único por implante.
+--    + profundidad: tercera medida del implante (AP / anteroposterior),
+--      espejo de profundidad_requerida en `request` — necesaria para que el
+--      motor de matching pueda calcular compatibility_profundidad (ver
+--      tabla `match`, columna ya existente pero sin dato de origen hasta
+--      ahora).
+--    + tipo_implante ampliado a VARCHAR(300): el nombre que se le pone al
+--      tipo de implante es el dato visible/diferenciador y debe admitir
+--      nombres largos y descriptivos, no solo una palabra corta.
 -- ============================================================================
 CREATE TABLE implant (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     codigo_visible      VARCHAR(40)  NOT NULL UNIQUE,
     donor_id            UUID NOT NULL REFERENCES donor(id),
     parte_cuerpo        VARCHAR(80)  NOT NULL,
-    tipo_implante       VARCHAR(80)  NOT NULL,
+    tipo_implante       VARCHAR(300) NOT NULL,
     alto                INTEGER,
     ancho               INTEGER,
+    profundidad         INTEGER,
     estado              VARCHAR(30)  NOT NULL DEFAULT 'disponible',
     notas_adicionales   TEXT,
     url_imagen          TEXT,
@@ -120,7 +143,7 @@ CREATE TABLE request (
     doctor_id                   UUID NOT NULL REFERENCES app_user(id),
     patient_id                  UUID NOT NULL REFERENCES patient(id),
     ips_id                      UUID NOT NULL REFERENCES ips(id),
-    tejido_solicitado           VARCHAR(80)  NOT NULL,
+    tejido_solicitado           VARCHAR(300) NOT NULL,
     procedimiento_quirurgico    VARCHAR(160),
     alto_requerido              INTEGER NOT NULL,
     ancho_requerido             INTEGER NOT NULL,
@@ -295,6 +318,7 @@ LEFT JOIN dispatch disp     ON disp.assignment_id = a.id;
 -- DROP TABLE IF EXISTS match;
 -- DROP TABLE IF EXISTS request;
 -- DROP TABLE IF EXISTS implant;
+-- DROP TABLE IF EXISTS tissue_type;
 -- DROP TABLE IF EXISTS donor;
 -- DROP TABLE IF EXISTS ips;
 -- DROP TABLE IF EXISTS patient;

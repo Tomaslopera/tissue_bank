@@ -416,6 +416,7 @@ const API = {
         tipo_implante: data.tipo_implante,
         alto: data.alto ?? null,
         ancho: data.ancho ?? null,
+        profundidad: data.profundidad ?? null,
         estado: data.estado || 'disponible',
         notas_adicionales: data.notas_adicionales || '',
         url_imagen: data.url_imagen || '',
@@ -431,6 +432,16 @@ const API = {
       // en vez de adivinar una ruta que podría no existir.
       throw new Error('Eliminar implantes no está soportado por la API actual (falta DELETE /implants/{id}).');
     },
+  },
+
+  // ==========================================================================
+  // tissueTypes — catálogo de "Tipo de implante" (antes lista fija en el
+  // HTML). Permite agregar tipos nuevos desde el Panel Tejidos; quedan
+  // guardados en el backend y disponibles para todos.
+  // ==========================================================================
+  tissueTypes: {
+    async list(){ return unwrapList(await get('/tissue-types')); },
+    async create(nombre){ return post('/tissue-types', { nombre }); },
   },
 
   requests: {

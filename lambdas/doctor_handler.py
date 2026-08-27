@@ -13,10 +13,15 @@ Rutas exactas que debe configurar API Gateway para este handler:
     PATCH  /doctors/{id}/status             -> activar / desactivar
     POST   /doctors/{id}/reset-password     -> generar contraseña nueva
 
-Todas las rutas de este handler requieren rol admin — un doctor nunca debe
-poder crear ni editar cuentas de otros doctores. La validación de rol se
-hace leyendo el JWT (Authorization: Bearer <token>), NO confiando en nada
-que venga en el body.
+Todas las rutas de escritura (crear, editar, activar/desactivar, resetear
+contraseña) y el listado completo requieren rol admin — un doctor nunca
+debe poder crear ni editar cuentas de otros doctores. La única excepción es
+GET /doctors/{id} cuando el id pedido es el propio (auth_payload["sub"]):
+un doctor necesita poder ver su propio perfil (Panel "Mi perfil") y su
+nombre aparece también en las tarjetas de match de otros doctores/admin
+(doctorDisplayName), así que esa lectura puntual no exige admin. La
+validación de rol se hace leyendo el JWT (Authorization: Bearer <token>),
+NO confiando en nada que venga en el body.
 
 Formato de respuesta al crear/resetear contraseña: la contraseña en texto
 plano se devuelve UNA sola vez, en el body de la respuesta HTTP — nunca se
@@ -48,7 +53,7 @@ def lambda_handler(event, context):
         if method == "OPTIONS":
             return ok({})
 
-        # --- Autenticación + autorización: todo este handler es solo-admin ---
+        # --- Autenticación + autorización: admin, o el doctor viendo su propio perfil ---
         try:
             auth_payload = get_auth_context(event)
         except TokenError as exc:
@@ -56,11 +61,16 @@ def lambda_handler(event, context):
 
         if auth_payload is None:
             return unauthorized("Debes iniciar sesión para hacer esto.")
-        if not require_role(auth_payload, "admin"):
-            return forbidden("Solo un administrador puede gestionar cuentas de doctores.")
 
         raw_path = event.get("rawPath") or event.get("path") or ""
         doctor_user_id = path_param(event, "id")
+        is_own_profile_read = (
+            method == "GET"
+            and doctor_user_id
+            and str(auth_payload.get("sub")) == str(doctor_user_id)
+        )
+        if not require_role(auth_payload, "admin") and not is_own_profile_read:
+            return forbidden("Solo un administrador puede gestionar cuentas de doctores.")
 
         if method == "POST" and raw_path.endswith("/reset-password"):
             return reset_password(doctor_user_id)

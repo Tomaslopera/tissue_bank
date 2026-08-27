@@ -7,8 +7,11 @@ Rutas que atiende:
     GET    /implants/{id}     -> ver uno
     PUT    /implants/{id}     -> editar
 
-Acceso: SOLO admin — misma decisión que donor_handler, porque el
-inventario de implantes vive en el mismo Panel Tejidos que solo ve el
+Acceso: GET (listar/ver) es para cualquier usuario autenticado — un doctor
+necesita poder ver el detalle del implante que le llega en su tarjeta de
+match (Panel Solicitantes), aunque no pueda editar inventario. Crear/editar
+(POST/PUT) sigue siendo SOLO admin, misma decisión que donor_handler,
+porque la gestión del inventario vive en el Panel Tejidos que solo ve el
 admin en el frontend original.
 
 Este handler es un CRUD puro — NO incluye ninguna lógica de matching. La
@@ -42,7 +45,9 @@ def lambda_handler(event, context):
 
         if auth_payload is None:
             return unauthorized("Debes iniciar sesión para hacer esto.")
-        if not require_role(auth_payload, "admin"):
+        if not require_role(auth_payload, "admin", "doctor"):
+            return forbidden("No tienes permiso para hacer esto.")
+        if method != "GET" and not require_role(auth_payload, "admin"):
             return forbidden("Solo un administrador puede gestionar el inventario de implantes.")
 
         implant_id = path_param(event, "id")
@@ -98,9 +103,9 @@ def create_implant(event):
     row = query_one(
         """
         INSERT INTO implant
-            (codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, estado, notas_adicionales, url_imagen)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, estado, notas_adicionales, url_imagen
+            (codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, profundidad, estado, notas_adicionales, url_imagen)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, profundidad, estado, notas_adicionales, url_imagen
         """,
         (
             body["codigo_visible"].strip(),
@@ -109,6 +114,7 @@ def create_implant(event):
             body["tipo_implante"].strip(),
             body.get("alto"),
             body.get("ancho"),
+            body.get("profundidad"),
             estado,
             body.get("notas_adicionales"),
             body.get("url_imagen"),
@@ -126,7 +132,7 @@ def list_all(event):
     search = query_param(event, "search")
 
     sql = """
-        SELECT id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, estado, notas_adicionales, url_imagen
+        SELECT id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, profundidad, estado, notas_adicionales, url_imagen
         FROM implant
         WHERE 1=1
     """
@@ -151,7 +157,7 @@ def list_all(event):
 # ============================================================================
 def get_one(implant_id):
     row = query_one(
-        "SELECT id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, estado, notas_adicionales, url_imagen "
+        "SELECT id, codigo_visible, donor_id, parte_cuerpo, tipo_implante, alto, ancho, profundidad, estado, notas_adicionales, url_imagen "
         "FROM implant WHERE id = %s",
         (implant_id,),
     )
@@ -196,7 +202,7 @@ def update_implant(implant_id, event):
         """
         UPDATE implant
         SET codigo_visible = %s, parte_cuerpo = %s, tipo_implante = %s, alto = %s, ancho = %s,
-            estado = %s, notas_adicionales = %s, url_imagen = %s
+            profundidad = %s, estado = %s, notas_adicionales = %s, url_imagen = %s
         WHERE id = %s
         """,
         (
@@ -205,6 +211,7 @@ def update_implant(implant_id, event):
             body["tipo_implante"].strip(),
             body.get("alto"),
             body.get("ancho"),
+            body.get("profundidad"),
             estado,
             body.get("notas_adicionales"),
             body.get("url_imagen"),

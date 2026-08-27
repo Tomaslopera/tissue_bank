@@ -37,6 +37,29 @@ function daysUntil(dateStr){
   return Math.round((target - now) / 86400000);
 }
 
+// Suma días a una fecha YYYY-MM-DD y devuelve otra fecha YYYY-MM-DD — usado
+// para la fecha de vencimiento del donante (14 días desde la extracción).
+function addDaysISO(dateStr, days){
+  if(!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d)) return '';
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+
+// Edad en años cumplidos a partir de la fecha de nacimiento (paciente).
+function calcularEdad(fechaNacimientoStr){
+  if(!fechaNacimientoStr) return '';
+  const nacimiento = new Date(fechaNacimientoStr + 'T00:00:00');
+  if(isNaN(nacimiento)) return '';
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const aunNoCumple = (hoy.getMonth() < nacimiento.getMonth()) ||
+    (hoy.getMonth() === nacimiento.getMonth() && hoy.getDate() < nacimiento.getDate());
+  if(aunNoCumple) edad--;
+  return edad >= 0 ? edad : '';
+}
+
 const ESTADO_LABELS = {
   disponible: { label: 'Disponible', badge: 'badge-green' },
   reservado: { label: 'Reservado', badge: 'badge-purple' },
@@ -324,6 +347,15 @@ async function renderTodasSolicitudes(){
 // ==========================================================================
 // Panel Tejidos — inventario agrupado por donante
 // ==========================================================================
+// Dimensiones del implante como texto — incluye la profundidad (AP) cuando
+// está cuantificada, además de altura y ancho (transversal).
+function formatDimsImplante(implant){
+  if(!implant.alto || !implant.ancho) return 'No cuantificado';
+  let txt = implant.alto + ' × ' + implant.ancho;
+  if(implant.profundidad) txt += ' × ' + implant.profundidad;
+  return txt + ' mm';
+}
+
 function buildImplantTile(implant, donor, expiring){
   const estadoInfo = ESTADO_LABELS[implant.estado] || ESTADO_LABELS.disponible;
   const showPorVencer = expiring && implant.estado === 'disponible';
@@ -333,14 +365,74 @@ function buildImplantTile(implant, donor, expiring){
   tile.innerHTML = `
     <div class="implant-tile-top">
       <div>
-        <div class="implant-tile-name">${implant.tipo_implante}</div>
+        <div class="implant-tile-name">${implant.tipo_implante} <span class="code-badge">${implant.codigo_visible || '—'}</span></div>
         <div class="implant-tile-part">${implant.parte_cuerpo}</div>
       </div>
       <span class="badge ${showPorVencer ? 'badge-amber' : estadoInfo.badge}">${showPorVencer ? 'Por vencer' : estadoInfo.label}</span>
     </div>
-    <span class="implant-tile-dims">${(implant.alto && implant.ancho) ? implant.alto+' × '+implant.ancho+' mm' : 'No cuantificado'}</span>
+    <span class="implant-tile-dims">${formatDimsImplante(implant)}</span>
   `;
   return tile;
+}
+
+// ==========================================================================
+// Catálogo "Tipo de implante" — antes una lista fija en el HTML, ahora un
+// catálogo persistido en el backend (tabla tissue_type) que el admin puede
+// extender desde cualquiera de los 3 formularios de implante.
+// ==========================================================================
+let tissueTypesCache = [];
+
+async function cargarTiposImplante(){
+  try{
+    tissueTypesCache = await API.tissueTypes.list();
+  }catch(e){
+    tissueTypesCache = [];
+  }
+  renderTissueTypeSelect('implant-tipo-implante');
+  renderTissueTypeSelect('edit-implant-tipo-implante');
+  renderTissueTypeSelect('agregar-implante-tipo-implante');
+}
+
+function renderTissueTypeSelect(selectId, selectedValue){
+  const select = document.getElementById(selectId);
+  if(!select) return;
+  const current = selectedValue !== undefined ? selectedValue : select.value;
+  // Si el valor actual (dato legado) no está en el catálogo todavía, se
+  // agrega como opción extra para no dejarlo en blanco al editar.
+  const options = tissueTypesCache.slice();
+  if(current && current !== '__nuevo__' && !options.some(t=> t.nombre === current)){
+    options.push({ nombre: current });
+  }
+  select.innerHTML = '<option value="">Seleccionar...</option>' +
+    options.map(t=> `<option value="${t.nombre}">${t.nombre}</option>`).join('') +
+    '<option value="__nuevo__">+ Agregar nuevo tipo...</option>';
+  if(current && current !== '__nuevo__') select.value = current;
+}
+
+// Se dispara al elegir "+ Agregar nuevo tipo..." en cualquiera de los 3
+// selects de tipo de implante — pide el nombre, lo guarda en el catálogo
+// (tabla tissue_type) y lo deja seleccionado en ese mismo select.
+async function manejarCambioTipoImplante(selectEl){
+  if(selectEl.value !== '__nuevo__') return;
+  const nombre = (window.prompt('Nombre del nuevo tipo de implante:', '') || '').trim();
+  if(!nombre){
+    selectEl.value = '';
+    return;
+  }
+  try{
+    const tipo = await API.tissueTypes.create(nombre);
+    if(!tissueTypesCache.some(t=> t.nombre.toLowerCase() === tipo.nombre.toLowerCase())){
+      tissueTypesCache.push(tipo);
+      tissueTypesCache.sort((a,b)=> a.nombre.localeCompare(b.nombre));
+    }
+    ['implant-tipo-implante','edit-implant-tipo-implante','agregar-implante-tipo-implante'].forEach(id=>{
+      const el = document.getElementById(id);
+      renderTissueTypeSelect(id, el === selectEl ? tipo.nombre : undefined);
+    });
+  }catch(e){
+    window.alert('No se pudo guardar el nuevo tipo de implante: ' + e.message);
+    selectEl.value = '';
+  }
 }
 
 async function renderInventarioTejidos(){
@@ -449,8 +541,8 @@ async function renderHistorialDonantes(){
       tr.innerHTML = `
         <td><span class="code-badge">${donor.codigo_donante}</span></td>
         <td>${implant.parte_cuerpo}</td>
-        <td>${implant.tipo_implante}</td>
-        <td>${implant.alto ?? '—'} × ${implant.ancho ?? '—'}</td>
+        <td>${implant.tipo_implante} <span class="code-badge">${implant.codigo_visible || '—'}</span></td>
+        <td>${formatDimsImplante(implant)}</td>
         <td>${formatDate(donor.fecha_vencimiento)}</td>
         <td><span class="badge badge-blue">Despachado${implant.codigo_visible ? ' — '+implant.codigo_visible : ''}</span></td>
       `;
@@ -522,8 +614,9 @@ async function buildMatchCardPendiente(m){
     <div class="match-v2-detail">
       <div class="compat-block" style="margin-top:0">
         <div class="compat-title">Compatibilidad dimensional</div>
-        ${buildCompatRow('Alto', req.alto_requerido, m.compatibility_alto, implant.alto)}
-        ${buildCompatRow('Ancho', req.ancho_requerido, m.compatibility_ancho, implant.ancho)}
+        ${buildCompatRow('Altura', req.alto_requerido, m.compatibility_alto, implant.alto)}
+        ${buildCompatRow('Ancho — Transversal', req.ancho_requerido, m.compatibility_ancho, implant.ancho)}
+        ${buildCompatRow('AP', req.profundidad_requerida, m.compatibility_profundidad, implant.profundidad)}
         <div class="compat-summary">
           <span class="compat-summary-label">Compatibilidad general</span>
           <span class="badge badge-green badge-lg">${m.compatibility_score>=85?'Alta':'Media'} — ${Math.round(m.compatibility_score)}%</span>
@@ -724,7 +817,7 @@ async function renderAsignacionesPendientes(){
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
               <div class="match-title" style="margin-bottom:0">${patient.nombre} ${patient.apellido} — ${req.procedimiento_quirurgico || req.tejido_solicitado}</div>
             </div>
-            <div class="match-meta">${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''} ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm · Compatibilidad: ${Math.round(m.compatibility_score)}% · ${doctorName} aprobó</div>
+            <div class="match-meta">${implant.tipo_implante}${implant.codigo_visible ? ' '+implant.codigo_visible : ''} ${formatDimsImplante(implant)} · Compatibilidad: ${Math.round(m.compatibility_score)}% · ${doctorName} aprobó</div>
             <div style="font-size:10.5px;color:var(--ink-faint);margin-top:4px">IPS: ${ips?ips.nombre:'—'} · Cirugía: ${formatDate(req.fecha_estimada_cirugia)} · Identificación: ${patient.tipo_identificacion} ${patient.numero_identificacion}</div>
           </div>
           <span class="badge badge-green" style="align-self:center;white-space:nowrap">Doctor aprobó</span>
@@ -842,7 +935,7 @@ async function renderDespachosPorEtiquetar(){
           <div class="etiqueta-row"><span class="etiqueta-lbl">Paciente</span><span class="etiqueta-val">${patient.nombre} ${patient.apellido}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Identificación</span><span class="etiqueta-val">${patient.tipo_identificacion} ${patient.numero_identificacion}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Sexo paciente</span><span class="etiqueta-val">${patientSexo === 'M' ? 'Masculino' : patientSexo === 'F' ? 'Femenino' : '—'}</span></div>
-          <div class="etiqueta-row"><span class="etiqueta-lbl">Tejido</span><span class="etiqueta-val">${implant.tipo_implante} · ${implant.alto ?? '?'}×${implant.ancho ?? '?'} mm</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Tejido</span><span class="etiqueta-val">${implant.tipo_implante} · ${implant.codigo_visible || '—'} · ${formatDimsImplante(implant)}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Donante</span><span class="etiqueta-val">${donor ? donor.codigo_donante : '—'} · Sexo: ${donorSexo === 'M' ? 'M' : donorSexo === 'F' ? 'F' : '—'}</span></div>
           <div class="etiqueta-row etiqueta-ips"><span class="etiqueta-lbl">IPS destino</span><span class="etiqueta-val">${ips ? ips.nombre : '—'}${ips && ips.ciudad ? ', '+ips.ciudad : ''}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Médico</span><span class="etiqueta-val">${doctorName}</span></div>
@@ -1251,7 +1344,7 @@ async function enviarSolicitud(){
         nombre: document.getElementById('sol-nombre').value.trim(),
         apellido: document.getElementById('sol-apellido').value.trim(),
         fecha_nacimiento: document.getElementById('sol-fecha-nac').value || null,
-        edad: Number(document.getElementById('sol-edad').value) || null,
+        edad: calcularEdad(document.getElementById('sol-fecha-nac').value) || null,
         nacionalidad: document.getElementById('sol-nacionalidad').value.trim(),
         sexo_biologico: document.getElementById('sol-sexo-biologico')?.value || null,
       });
@@ -1315,6 +1408,26 @@ function actualizarBadgeDonante(){
   if(badge) badge.textContent = codigo;
 }
 
+// Vencimiento = extracción + 14 días, fijo para todos los implantes del
+// donante (ver warn-note del modal). Se recalcula solo cuando cambia la
+// fecha de extracción — el campo queda readonly para que no se desalinee.
+const DIAS_VENCIMIENTO_DONANTE = 14;
+
+function actualizarFechaVencimientoDonante(){
+  const extraccion = document.getElementById('donante-fecha-extraccion').value;
+  document.getElementById('donante-fecha-vencimiento').value = addDaysISO(extraccion, DIAS_VENCIMIENTO_DONANTE);
+}
+
+function actualizarFechaVencimientoEditDonante(){
+  const extraccion = document.getElementById('edit-donante-fecha-extraccion').value;
+  document.getElementById('edit-donante-fecha-vencimiento').value = addDaysISO(extraccion, DIAS_VENCIMIENTO_DONANTE);
+}
+
+function actualizarEdadSolicitud(){
+  const fechaNac = document.getElementById('sol-fecha-nac').value;
+  document.getElementById('sol-edad').value = calcularEdad(fechaNac);
+}
+
 function renderImplantesLista(){
   const container = document.getElementById('implantes-lista');
   const emptyMsg = document.getElementById('implantes-lista-vacia');
@@ -1332,7 +1445,7 @@ function renderImplantesLista(){
     card.className = 'implant-card';
     card.innerHTML = `
       <div class="implant-header">
-        <div class="implant-title">Implante ${index + 1} — ${implante.tipo_implante || 'Sin tipo'}${implante.codigo_visible ? ' (' + implante.codigo_visible + ')' : ''}</div>
+        <div class="implant-title">Implante ${index + 1} — ${implante.tipo_implante || 'Sin tipo'} <span class="code-badge">${implante.codigo_visible || '—'}</span></div>
         <div class="implant-actions">
           <span class="badge ${estadoInfo.badge}">${estadoInfo.label}</span>
           <button type="button" class="implant-action-btn" title="Editar" onclick="editarImplante(${index})"><i class="ti ti-pencil"></i></button>
@@ -1342,7 +1455,7 @@ function renderImplantesLista(){
       <div class="implant-grid">
         <div>${implante.url_imagen ? `<img class="implant-thumb" src="${implante.url_imagen}" alt=""/>` : '<span class="implant-grid-label">Sin foto</span>'}</div>
         <div><span class="implant-grid-label">Parte del cuerpo</span>${implante.parte_cuerpo || '—'}</div>
-        <div><span class="implant-grid-label">Dimensiones (mm)</span>${implante.alto || '?'} × ${implante.ancho || '?'}</div>
+        <div><span class="implant-grid-label">Dimensiones (mm)</span>${implante.alto || '?'} × ${implante.ancho || '?'} × ${implante.profundidad || '?'}</div>
         <div><span class="implant-grid-label">Estado</span>${estadoInfo.label}</div>
       </div>
       ${implante.notas_adicionales ? `<div class="implant-notas-row"><strong>Notas:</strong> ${implante.notas_adicionales}</div>` : ''}
@@ -1357,6 +1470,7 @@ function limpiarFormularioImplante(){
   document.getElementById('implant-tipo-implante').value = '';
   document.getElementById('implant-alto').value = '';
   document.getElementById('implant-ancho').value = '';
+  document.getElementById('implant-profundidad').value = '';
   document.getElementById('implant-estado').value = 'disponible';
   document.getElementById('implant-notas').value = '';
   document.getElementById('implant-url-imagen').value = '';
@@ -1365,7 +1479,7 @@ function limpiarFormularioImplante(){
   document.getElementById('implant-foto-preview').src = '';
   document.getElementById('implant-upload-icon').style.display = '';
   document.getElementById('implant-upload-text').style.display = '';
-  ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'].forEach(id=>{
+  ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho','implant-profundidad'].forEach(id=>{
     document.getElementById(id).classList.remove('invalid');
     const err = document.getElementById(id+'-error');
     if(err) err.classList.remove('show');
@@ -1373,7 +1487,7 @@ function limpiarFormularioImplante(){
 }
 
 function validarFormularioImplante(){
-  const requiredIds = ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho'];
+  const requiredIds = ['implant-codigo-visible','implant-parte-cuerpo','implant-tipo-implante','implant-alto','implant-ancho','implant-profundidad'];
   let valid = true;
   requiredIds.forEach(id=>{
     const el = document.getElementById(id);
@@ -1399,6 +1513,7 @@ function guardarImplanteEnLista(){
     tipo_implante: document.getElementById('implant-tipo-implante').value,
     alto: Number(document.getElementById('implant-alto').value),
     ancho: Number(document.getElementById('implant-ancho').value),
+    profundidad: Number(document.getElementById('implant-profundidad').value),
     estado: document.getElementById('implant-estado').value,
     notas_adicionales: document.getElementById('implant-notas').value,
     url_imagen: document.getElementById('implant-url-imagen').value,
@@ -1424,6 +1539,7 @@ function editarImplante(index){
   document.getElementById('implant-tipo-implante').value = implante.tipo_implante;
   document.getElementById('implant-alto').value = implante.alto;
   document.getElementById('implant-ancho').value = implante.ancho;
+  document.getElementById('implant-profundidad').value = implante.profundidad ?? '';
   document.getElementById('implant-estado').value = implante.estado;
   document.getElementById('implant-notas').value = implante.notas_adicionales || '';
   document.getElementById('implant-url-imagen').value = implante.url_imagen || '';
@@ -1502,12 +1618,13 @@ async function guardarDonanteEImplantes(){
   successBanner.style.display = 'none';
 
   try{
+    const fechaExtraccion = document.getElementById('donante-fecha-extraccion').value;
     const donor = await API.donors.create({
       codigo_donante: document.getElementById('donante-codigo').value.trim(),
-      fecha_extraccion: document.getElementById('donante-fecha-extraccion').value,
+      fecha_extraccion: fechaExtraccion,
       fecha_procedimiento: document.getElementById('donante-fecha-procedimiento').value || null,
       fecha_segundo_cambio: document.getElementById('donante-fecha-segundo-cambio').value || null,
-      fecha_vencimiento: document.getElementById('donante-fecha-vencimiento').value,
+      fecha_vencimiento: addDaysISO(fechaExtraccion, DIAS_VENCIMIENTO_DONANTE),
       sexo_biologico: document.getElementById('donante-sexo-biologico').value,
     });
 
@@ -1538,12 +1655,12 @@ async function abrirDetalleImplante(implantId){
 
   document.getElementById('det-implante-id').value = implant.id;
 
-  setText('det-implante-titulo', implant.tipo_implante);
+  setText('det-implante-titulo', implant.tipo_implante + (implant.codigo_visible ? ' — ' + implant.codigo_visible : ''));
   setText('det-implante-donor-codigo', donor ? donor.codigo_donante : '—');
   setText('det-implante-donor-codigo-2', donor ? donor.codigo_donante : '—');
   setText('det-implante-parte', implant.parte_cuerpo);
   setText('det-implante-tipo', implant.tipo_implante);
-  setText('det-implante-dims', (implant.alto && implant.ancho) ? `${implant.alto} × ${implant.ancho}` : 'No cuantificado');
+  setText('det-implante-dims', formatDimsImplante(implant));
   setText('det-implante-estado', estadoInfo.label + (expiring && implant.estado==='disponible' ? ' · por vencer' : ''));
   setText('det-implante-donor-extraccion', donor ? formatDate(donor.fecha_extraccion) : '—');
   setText('det-implante-donor-vencimiento', donor ? formatDate(donor.fecha_vencimiento) : '—');
@@ -1569,13 +1686,14 @@ async function abrirEditarImplanteUI(implantId){
   document.getElementById('edit-implant-id').value = implant.id;
   document.getElementById('edit-implant-codigo-visible').value = implant.codigo_visible || '';
   document.getElementById('edit-implant-parte-cuerpo').value = implant.parte_cuerpo || '';
-  document.getElementById('edit-implant-tipo-implante').value = implant.tipo_implante || '';
+  renderTissueTypeSelect('edit-implant-tipo-implante', implant.tipo_implante || '');
   document.getElementById('edit-implant-alto').value = implant.alto ?? '';
   document.getElementById('edit-implant-ancho').value = implant.ancho ?? '';
+  document.getElementById('edit-implant-profundidad').value = implant.profundidad ?? '';
   document.getElementById('edit-implant-estado').value = implant.estado || 'disponible';
   document.getElementById('edit-implant-notas').value = implant.notas_adicionales || '';
   document.getElementById('edit-implant-error').style.display = 'none';
-  ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho'].forEach(id=>{
+  ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho','edit-implant-profundidad'].forEach(id=>{
     document.getElementById(id).classList.remove('invalid');
     const err = document.getElementById(id+'-error');
     if(err) err.classList.remove('show');
@@ -1584,7 +1702,7 @@ async function abrirEditarImplanteUI(implantId){
 }
 
 async function guardarEdicionImplanteUI(){
-  const requiredIds = ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho'];
+  const requiredIds = ['edit-implant-codigo-visible','edit-implant-parte-cuerpo','edit-implant-tipo-implante','edit-implant-alto','edit-implant-ancho','edit-implant-profundidad'];
   let valid = true;
   requiredIds.forEach(id=>{
     const el = document.getElementById(id);
@@ -1611,6 +1729,7 @@ async function guardarEdicionImplanteUI(){
       tipo_implante: document.getElementById('edit-implant-tipo-implante').value,
       alto: Number(document.getElementById('edit-implant-alto').value),
       ancho: Number(document.getElementById('edit-implant-ancho').value),
+      profundidad: Number(document.getElementById('edit-implant-profundidad').value),
       estado: document.getElementById('edit-implant-estado').value,
       notas_adicionales: document.getElementById('edit-implant-notas').value.trim(),
     });
@@ -1644,12 +1763,13 @@ async function guardarEdicionDonanteUI(){
   errorBanner.style.display = 'none';
 
   try{
+    const fechaExtraccion = document.getElementById('edit-donante-fecha-extraccion').value;
     await API.donors.update(id, {
       codigo_donante: document.getElementById('edit-donante-codigo').value.trim(),
-      fecha_extraccion: document.getElementById('edit-donante-fecha-extraccion').value,
+      fecha_extraccion: fechaExtraccion,
       fecha_procedimiento: document.getElementById('edit-donante-fecha-procedimiento').value || null,
       fecha_segundo_cambio: document.getElementById('edit-donante-fecha-segundo-cambio').value || null,
-      fecha_vencimiento: document.getElementById('edit-donante-fecha-vencimiento').value,
+      fecha_vencimiento: addDaysISO(fechaExtraccion, DIAS_VENCIMIENTO_DONANTE),
       sexo_biologico: document.getElementById('edit-donante-sexo-biologico').value || null,
     });
   }catch(e){
@@ -1667,7 +1787,7 @@ async function abrirAgregarImplanteUI(donorId){
   if(!donor) return;
   document.getElementById('agregar-implante-donor-id').value = donorId;
   setText('agregar-implante-donor-codigo', donor.codigo_donante || '');
-  ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho','agregar-implante-notas'].forEach(id=>{
+  ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho','agregar-implante-profundidad','agregar-implante-notas'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('agregar-implante-estado').value = 'disponible';
@@ -1676,7 +1796,7 @@ async function abrirAgregarImplanteUI(donorId){
 }
 
 async function guardarImplanteAgregadoUI(){
-  const requiredIds = ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho'];
+  const requiredIds = ['agregar-implante-codigo-visible','agregar-implante-parte-cuerpo','agregar-implante-tipo-implante','agregar-implante-alto','agregar-implante-ancho','agregar-implante-profundidad'];
   let valid = true;
   requiredIds.forEach(id=>{
     const el = document.getElementById(id);
@@ -1703,6 +1823,7 @@ async function guardarImplanteAgregadoUI(){
       tipo_implante: document.getElementById('agregar-implante-tipo-implante').value,
       alto: Number(document.getElementById('agregar-implante-alto').value),
       ancho: Number(document.getElementById('agregar-implante-ancho').value),
+      profundidad: Number(document.getElementById('agregar-implante-profundidad').value),
       estado: document.getElementById('agregar-implante-estado').value,
       notas_adicionales: document.getElementById('agregar-implante-notas').value.trim(),
     });
@@ -1783,8 +1904,9 @@ async function buildMatchCardDoctor(m){
     <div class="match-v2-detail">
       <div class="compat-block" style="margin-top:0">
         <div class="compat-title">Compatibilidad dimensional</div>
-        ${buildCompatRow('Alto',        req.alto_requerido,        m.compatibility_alto,         implant ? implant.alto  : null)}
-        ${buildCompatRow('Ancho',       req.ancho_requerido,       m.compatibility_ancho,        implant ? implant.ancho : null)}
+        ${buildCompatRow('Altura',              req.alto_requerido,          m.compatibility_alto,         implant ? implant.alto  : null)}
+        ${buildCompatRow('Ancho — Transversal', req.ancho_requerido,         m.compatibility_ancho,        implant ? implant.ancho : null)}
+        ${buildCompatRow('AP',                  req.profundidad_requerida,   m.compatibility_profundidad,  implant ? implant.profundidad : null)}
         <div class="compat-summary">
           <span class="compat-summary-label">Compatibilidad general</span>
           <span class="badge ${m.compatibility_score >= 85 ? 'badge-green' : 'badge-amber'} badge-lg">
@@ -1885,6 +2007,7 @@ async function refreshAll(){
     ]);
   } else {
     await Promise.all([
+      cargarTiposImplante(),
       renderTodasSolicitudes(),
       renderInventarioTejidos(),
       renderPorVencerTejidos(),
