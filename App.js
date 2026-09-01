@@ -555,17 +555,23 @@ async function renderHistorialDonantes(){
 // Panel Recomendaciones
 // ==========================================================================
 function buildCompatRow(label, requestVal, percent, implantVal){
-  const pct = percent ?? 0;
-  const barClass = pct>=85 ? 'high' : (pct>=70 ? 'mid' : 'low');
-  const detail = (implantVal !== undefined && implantVal !== null)
-    ? `${requestVal} → ${implantVal} mm`
-    : `${Math.round(pct)}% compatible`;
-  const ok = pct >= 70;
+  const hasPercent = percent !== undefined && percent !== null;
+  const pct = hasPercent ? percent : 0;
+  const barClass = !hasPercent ? 'unknown' : (pct>=85 ? 'high' : (pct>=70 ? 'mid' : 'low'));
+  const detail = !hasPercent
+    ? 'Sin dato de compatibilidad'
+    : (implantVal !== undefined && implantVal !== null)
+      ? `${requestVal} → ${implantVal} mm`
+      : `${Math.round(pct)}% compatible`;
+  const ok = hasPercent && pct >= 70;
+  const icon = !hasPercent ? 'ti-help-circle' : (ok ? 'ti-check' : 'ti-alert-triangle');
+  const color = !hasPercent ? 'var(--ink-dark)' : (ok ? 'var(--teal-deep)' : 'var(--rust-deep)');
+  const iconColor = !hasPercent ? 'var(--ink-dark)' : (ok ? 'var(--teal)' : 'var(--rust)');
   return `<div class="compat-row">
     <span class="compat-label">${label}</span>
     <div class="compat-bar-wrap"><div class="compat-bar ${barClass}" style="width:${Math.min(100,pct)}%"></div></div>
-    <span class="compat-detail" style="color:${ok?'var(--teal-deep)':'var(--rust-deep)'}">${detail}</span>
-    <span class="compat-icon"><i class="ti ${ok?'ti-check':'ti-alert-triangle'}" style="color:${ok?'var(--teal)':'var(--rust)'}"></i></span>
+    <span class="compat-detail" style="color:${color}">${detail}</span>
+    <span class="compat-icon"><i class="ti ${icon}" style="color:${iconColor}"></i></span>
   </div>`;
 }
 
