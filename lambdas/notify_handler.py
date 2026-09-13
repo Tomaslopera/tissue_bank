@@ -19,6 +19,7 @@ Retorna:
 
 import os
 import json
+import html
 import urllib.request
 import urllib.error
 
@@ -106,7 +107,15 @@ def send_notification(match_id):
             code="CONFIG_ERROR",
         )
 
-    patient_full  = f"{data['patient_nombre']} {data['patient_apellido']}"
+    # Todo lo que viene de la BD (nombres, tejido, etc.) se escapa antes de
+    # interpolarlo en el HTML del correo — son campos de texto libre que
+    # cargan doctores/admin, no deben poder inyectar markup en el email.
+    patient_full_raw = f"{data['patient_nombre']} {data['patient_apellido']}"
+    patient_full  = html.escape(patient_full_raw)
+    doctor_nombre = html.escape(data["doctor_nombre"])
+    tejido        = html.escape(str(data["tejido_solicitado"]))
+    implante_cod  = html.escape(str(data["implante_codigo"]))
+    tipo_implante = html.escape(str(data["tipo_implante"]))
     score         = data["compatibility_score"]
     fecha_cirugia = str(data["fecha_estimada_cirugia"])
 
@@ -118,7 +127,7 @@ def send_notification(match_id):
       </div>
 
       <div style="background:#f9f9f7;padding:32px;border:1px solid #e5e5e0;border-top:none;border-radius:0 0 8px 8px">
-        <p style="font-size:15px;margin-top:0">Estimado/a <strong>{data['doctor_nombre']}</strong>,</p>
+        <p style="font-size:15px;margin-top:0">Estimado/a <strong>{doctor_nombre}</strong>,</p>
 
         <p style="font-size:15px">
           Se ha encontrado un implante compatible para su paciente
@@ -133,7 +142,7 @@ def send_notification(match_id):
             </tr>
             <tr style="border-top:1px solid #f0f0f0">
               <td style="padding:8px 0;color:#666">Tejido solicitado</td>
-              <td style="padding:8px 0;font-weight:600">{data['tejido_solicitado']}</td>
+              <td style="padding:8px 0;font-weight:600">{tejido}</td>
             </tr>
             <tr style="border-top:1px solid #f0f0f0">
               <td style="padding:8px 0;color:#666">Dimensiones requeridas</td>
@@ -141,7 +150,7 @@ def send_notification(match_id):
             </tr>
             <tr style="border-top:1px solid #f0f0f0">
               <td style="padding:8px 0;color:#666">Implante sugerido</td>
-              <td style="padding:8px 0;font-weight:600">{data['implante_codigo']} — {data['tipo_implante']}</td>
+              <td style="padding:8px 0;font-weight:600">{implante_cod} — {tipo_implante}</td>
             </tr>
             <tr style="border-top:1px solid #f0f0f0">
               <td style="padding:8px 0;color:#666">Dimensiones del implante</td>
@@ -173,7 +182,7 @@ def send_notification(match_id):
     payload = {
         "from":    FROM_EMAIL,
         "to":      [data["doctor_email"]],
-        "subject": f"TissueBank — Match disponible para {patient_full}",
+        "subject": f"TissueBank — Match disponible para {patient_full_raw}",
         "html":    html_body,
     }
 

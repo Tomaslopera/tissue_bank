@@ -916,6 +916,9 @@ async function renderDespachosPorEtiquetar(){
     const codigoOrden = req.codigo_visible || '—';
     const donorSexo = donor ? donor.sexo_biologico : '—';
     const patientSexo = patient.sexo_biologico || '—';
+    const donorDias = donor ? daysUntil(donor.fecha_vencimiento) : null;
+    const donorDiasDetail = donorDias === null ? '—' : (donorDias < 0 ? 'Vencido' : `${donorDias} día${donorDias===1?'':'s'} restantes`);
+    const donorDiasColor = donorDias !== null && donorDias <= 7 ? '#b3261e' : '#111';
 
     const card = document.createElement('div');
     card.className = 'dispatch-card';
@@ -942,7 +945,10 @@ async function renderDespachosPorEtiquetar(){
           <div class="etiqueta-row"><span class="etiqueta-lbl">Identificación</span><span class="etiqueta-val">${patient.tipo_identificacion} ${patient.numero_identificacion}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Sexo paciente</span><span class="etiqueta-val">${patientSexo === 'M' ? 'Masculino' : patientSexo === 'F' ? 'Femenino' : '—'}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Tejido</span><span class="etiqueta-val">${implant.tipo_implante} · ${implant.codigo_visible || '—'} · ${formatDimsImplante(implant)}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Parte del cuerpo</span><span class="etiqueta-val">${implant.parte_cuerpo || '—'}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Donante</span><span class="etiqueta-val">${donor ? donor.codigo_donante : '—'} · Sexo: ${donorSexo === 'M' ? 'M' : donorSexo === 'F' ? 'F' : '—'}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Fecha de extracción</span><span class="etiqueta-val">${donor ? formatDate(donor.fecha_extraccion) : '—'}</span></div>
+          <div class="etiqueta-row"><span class="etiqueta-lbl">Vencimiento del tejido</span><span class="etiqueta-val" style="color:${donorDiasColor}">${donorDiasDetail}</span></div>
           <div class="etiqueta-row etiqueta-ips"><span class="etiqueta-lbl">IPS destino</span><span class="etiqueta-val">${ips ? ips.nombre : '—'}${ips && ips.ciudad ? ', '+ips.ciudad : ''}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Médico</span><span class="etiqueta-val">${doctorName}</span></div>
           <div class="etiqueta-row"><span class="etiqueta-lbl">Cirugía estimada</span><span class="etiqueta-val">${formatDate(req.fecha_estimada_cirugia)}</span></div>

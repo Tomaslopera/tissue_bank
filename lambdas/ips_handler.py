@@ -28,7 +28,7 @@ duplicados como sí ocurre en patient_handler.
 from db import query, query_one
 from auth import get_auth_context, require_role, TokenError
 from response import (
-    ok, created, error, not_found, unauthorized, server_error,
+    ok, created, error, not_found, unauthorized, forbidden, server_error,
     require_fields, parse_body, path_param, query_param, http_method,
 )
 
@@ -44,8 +44,10 @@ def lambda_handler(event, context):
         except TokenError as exc:
             return unauthorized(str(exc))
 
-        if not require_role(auth_payload, "admin", "doctor"):
+        if auth_payload is None:
             return unauthorized("Debes iniciar sesión para hacer esto.")
+        if not require_role(auth_payload, "admin", "doctor"):
+            return forbidden("No tienes permiso para hacer esto.")
 
         ips_id = path_param(event, "id")
 

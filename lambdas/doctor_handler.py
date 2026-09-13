@@ -23,17 +23,18 @@ nombre aparece también en las tarjetas de match de otros doctores/admin
 validación de rol se hace leyendo el JWT (Authorization: Bearer <token>),
 NO confiando en nada que venga en el body.
 
-Formato de respuesta al crear/resetear contraseña: la contraseña en texto
-plano se devuelve UNA sola vez, en el body de la respuesta HTTP — nunca se
-persiste en texto plano (se guarda su hash bcrypt) ni se vuelve a exponer
-en ningún GET posterior.
+Formato de respuesta al crear/resetear contraseña: la contraseña se
+devuelve en el body de la respuesta HTTP (crear/resetear). Se guarda en
+texto plano en app_user.password (decisión confirmada explícitamente,
+igual que en auth_login_handler.py — bcrypt en cada login se consideró
+demasiado lento para lo que necesita esta app).
 """
 
 import secrets
 import string
 
 from db import query, query_one, transaction
-from auth import hash_password, get_auth_context, require_role, TokenError
+from auth import get_auth_context, require_role, TokenError
 from response import (
     ok, created, error, not_found, unauthorized, forbidden, server_error,
     require_fields, parse_body, path_param, http_method,
@@ -120,13 +121,12 @@ def create_doctor(event):
         )
 
     temp_password = generate_temp_password()
-    password_hash = hash_password(temp_password)
 
     with transaction() as cur:
         cur.execute(
             "INSERT INTO app_user (username, password, role, is_active) "
             "VALUES (%s, %s, 'doctor', true) RETURNING id",
-            (username, password_hash),
+            (username, temp_password),
         )
         new_user_id = cur.fetchone()["id"]
 
@@ -233,8 +233,7 @@ def reset_password(user_id):
         return not_found("Doctor")
 
     temp_password = generate_temp_password()
-    password_hash = hash_password(temp_password)
-    query("UPDATE app_user SET password = %s WHERE id = %s", (password_hash, user_id), fetch=False)
+    query("UPDATE app_user SET password = %s WHERE id = %s", (temp_password, user_id), fetch=False)
 
     return ok({
         "user_id": user_id,

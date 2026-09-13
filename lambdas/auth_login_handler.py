@@ -21,6 +21,13 @@ Response 200:
 Response 401  -> credenciales incorrectas
 Response 403  -> { "error": { "code": "ACCOUNT_INACTIVE", ... } } (cuenta desactivada)
 Response 400  -> faltan username/password
+
+Nota sobre verificación de contraseña (decisión confirmada explícitamente):
+la comparación es en texto plano (`password != user["password"]`), a
+propósito, NO con bcrypt — el costo de bcrypt.checkpw() por cada login
+se consideró demasiado lento para lo que necesita esta app (login rápido).
+doctor_handler.py guarda las contraseñas igual, en texto plano, por la
+misma razón — ver su nota correspondiente.
 """
 
 from db import query_one

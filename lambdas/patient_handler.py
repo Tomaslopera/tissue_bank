@@ -41,8 +41,10 @@ def lambda_handler(event, context):
         except TokenError as exc:
             return unauthorized(str(exc))
 
-        if not require_role(auth_payload, "admin", "doctor"):
+        if auth_payload is None:
             return unauthorized("Debes iniciar sesión para hacer esto.")
+        if not require_role(auth_payload, "admin", "doctor"):
+            return forbidden("No tienes permiso para hacer esto.")
 
         patient_id = path_param(event, "id")
 
