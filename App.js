@@ -1070,7 +1070,16 @@ async function renderDespachosEntregados(){
   setText('etiq-stat-total', allDispatches.length);
 }
 
-async function etiquetarDespachoUI(dispatchId){ await API.dispatches.label(dispatchId); refreshAll(); }
+// El backend modela el despacho en 4 estados (por_etiquetar → etiquetado →
+// en_camino → entregado) y /label solo avanza el primer paso, pero la UI
+// solo tiene tabs para "por etiquetar" y "en camino" — por eso hay que
+// encadenar /label + /deliver para que un despacho recién etiquetado no
+// quede invisible atascado en 'etiquetado' (sin tab que lo muestre).
+async function etiquetarDespachoUI(dispatchId){
+  await API.dispatches.label(dispatchId);
+  await API.dispatches.deliver(dispatchId);
+  refreshAll();
+}
 async function entregarDespachoUI(dispatchId){ await API.dispatches.deliver(dispatchId); refreshAll(); }
 
 function imprimirEtiqueta(dispatchId){
