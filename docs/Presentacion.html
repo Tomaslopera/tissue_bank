@@ -143,7 +143,25 @@ a:hover{opacity:.8}
 .demo li{counter-increment:s;display:flex;align-items:center;gap:22px;font-size:30px;background:var(--dark2);border:1px solid #245573;border-radius:14px;padding:14px 24px;color:#E6F0F6}
 .demo li::before{content:counter(s);flex:none;width:44px;height:44px;border-radius:50%;background:var(--cyan);color:var(--dark);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:26px}
 
-/* slide 12 */
+/* slide 12 · datos de la demo */
+.data{display:flex;gap:24px;align-items:stretch}
+.data .card{display:flex;flex-direction:column;gap:14px;padding:28px 32px}
+.data .c1{flex:1.05}.data .c2{flex:1.1}.data .c3{flex:1}
+.data .tag{font-size:22px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--blue)}
+.kv{display:flex;flex-direction:column}
+.kv>div{display:flex;justify-content:space-between;align-items:baseline;gap:20px;padding:9px 0;border-bottom:1px solid var(--line);font-size:26px;line-height:1.25}
+.kv>div:last-child{border-bottom:none}
+.kv .k{color:var(--muted);flex:none}
+.kv .v{color:var(--ink);font-weight:700;text-align:right}
+.imp{background:var(--blue-bg);border:1px solid #9ACBE4;border-radius:14px;padding:16px 22px;display:flex;flex-direction:column;gap:4px}
+.imp .t{font-size:28px;font-weight:700;color:var(--ink)}
+.imp .t span{font-family:'JetBrains Mono',monospace;font-size:24px;color:#0A4C73;font-weight:600}
+.imp .kv>div{padding:6px 0;font-size:24px;border-bottom-color:#B9DAEC}
+.fit{display:flex;align-items:center;gap:28px;background:var(--dark);border-radius:16px;padding:16px 30px;margin-top:auto}
+.fit b{font-size:30px;color:var(--cyan);flex:none}
+.fit span{font-size:26px;color:#C9DCE8;line-height:1.3}
+
+/* slide 13 */
 .big{display:flex;gap:24px}
 .big .card{flex:1;display:flex;flex-direction:column;gap:14px;padding:40px 32px}
 .big .v{font-size:132px;font-weight:700;line-height:1;color:var(--blue);letter-spacing:-3px}
@@ -418,7 +436,60 @@ a:hover{opacity:.8}
   </div>
 </section>
 
-<!-- 12. Construido -->
+<!-- 12. Datos de la demo -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow">Demostración · datos de entrada</div>
+    <h2>La información que usaremos en la demo</h2>
+  </div>
+  <div class="data">
+    <div class="card c1">
+      <div class="tag">Donante</div>
+      <div class="kv">
+        <div><span class="k">Código donante (INML)</span><span class="v mono">26.989</span></div>
+        <div><span class="k">Fecha de extracción</span><span class="v">28/09/2026</span></div>
+        <div><span class="k">Fecha de procesamiento</span><span class="v">11/09/2026</span></div>
+        <div><span class="k">2° cambio</span><span class="v">1/10/2026</span></div>
+        <div><span class="k">Vencimiento (+14 días)</span><span class="v">7/09/2026</span></div>
+        <div><span class="k">Sexo biológico</span><span class="v">Masculino</span></div>
+      </div>
+    </div>
+    <div class="card c2">
+      <div class="tag">Implantes registrados</div>
+      <div class="imp">
+        <div class="t">Implante 1 · <span>26.989 FEMUR DISTAL</span></div>
+        <div class="kv">
+          <div><span class="k">Parte del cuerpo</span><span class="v">Rodilla derecha</span></div>
+          <div><span class="k">Tipo de implante</span><span class="v">Fémur</span></div>
+          <div><span class="k">Dimensiones</span><span class="v mono">120 × 82 × 63 mm</span></div>
+        </div>
+      </div>
+      <div class="imp">
+        <div class="t">Implante 2 · <span>26.989 PATELA</span></div>
+        <div class="kv">
+          <div><span class="k">Parte del cuerpo</span><span class="v">Rodilla derecha</span></div>
+          <div><span class="k">Tipo de implante</span><span class="v">Patela</span></div>
+          <div><span class="k">Dimensiones</span><span class="v mono">32 × 43 × 22 mm</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card c3">
+      <div class="tag">Solicitud del doctor</div>
+      <div class="kv">
+        <div><span class="k">Paciente</span><span class="v">Sofia Grajales</span></div>
+        <div><span class="k">Identificación</span><span class="v mono">CC 1020106341</span></div>
+        <div><span class="k">IPS</span><span class="v">Clínica El Rosario</span></div>
+        <div><span class="k">Cirugía estimada</span><span class="v">12 oct 2026</span></div>
+        <div><span class="k">Médico</span><span class="v">Dr. Andrés Martínez</span></div>
+        <div><span class="k">Procedimiento</span><span class="v">Hueso · patela</span></div>
+        <div><span class="k">Dimensiones</span><span class="v mono">29 × 40 × 20 mm</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="fit"><b>Match esperado</b><span>La patela del donante 26.989 (32 × 43 × 22 mm) cubre lo pedido (29 × 40 × 20 mm) con +3, +3 y +2 mm: dentro del filtro de tolerancia de 5 mm.</span></div>
+</section>
+
+<!-- 13. Construido -->
 <section class="slide">
   <div class="head">
     <div class="eyebrow">Lo construido</div>
