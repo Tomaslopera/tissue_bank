@@ -2,6 +2,33 @@
 
 TissueBank es una empresa colombiana dedicada a la distribución de tejidos ortopédicos donados a médicos cirujanos. El proceso anterior operaba en papel, Excel y WhatsApp; este proyecto lo digitaliza y automatiza de principio a fin: desde la solicitud del doctor hasta el despacho físico del tejido.
 
+## Estructura del repositorio
+
+```text
+tissue_bank/
+├── Index.html          # Pantallas, paneles y formularios del frontend
+├── Styles.css          # Estilos de la interfaz
+├── App.js              # Navegación, renderizado y acciones de los paneles
+├── Data.js             # Cliente HTTP y contrato API usado por App.js
+├── Schema.sql          # Tablas y vistas de PostgreSQL/Supabase
+├── assets/             # Logos e imágenes estáticas de la interfaz
+├── lambdas/            # Funciones Python que atienden las rutas de la API
+├── scripts/            # Migraciones y consultas de mantenimiento SQL
+└── docs/               # Documentación funcional, presentación y diagramas
+    ├── Guia-de-uso.md             # Paso a paso de los paneles para doctor y administrador
+    ├── Overview.md                # Contexto, arquitectura, roles, API y flujo del sistema
+    ├── Presentacion.html          # Presentación del proyecto y demostración del MVP
+    ├── Tissue.pdf                 # Formularios originales de solicitud de tejidos
+    ├── Architecture.png           # Imagen de la propuesta de arquitectura objetivo
+    ├── Architecture.drawio        # Diagrama editable de paneles y arquitectura
+    ├── AWS Architecture.drawio    # Diagrama editable de componentes en AWS
+    └── Global Architecture.drawio # Diagrama editable del flujo general
+```
+
+El frontend está en la raíz y no requiere compilación. `Index.html` carga `Styles.css`, `Data.js` y `App.js`; las acciones de los paneles en `App.js` consultan la API mediante `Data.js`. El backend vive en `lambdas/` y usa el modelo definido en `Schema.sql`.
+
+**Para usar la interfaz:** sigue la [guía paso a paso de los paneles](docs/Guia-de-uso.md), organizada por los roles doctor y administrador.
+
 ## Arquitectura
 
 ![Arquitectura AWS + Supabase](docs/Architecture.png)
