@@ -1,5 +1,8 @@
 # TissueBank — Sistema de Asignación Automatizada de Tejidos (SAAT)
 
+> [!IMPORTANT]
+> **Este proyecto es una prueba de concepto (PoC), no un servicio de producción.** Está desplegado bajo mi infraestructura personal y su disponibilidad no está garantizada. La base de datos de Supabase se pausa después de **14 días sin uso**, por lo que la aplicación puede dejar de responder hasta que la reactive. Si empiezo a recibir cobros por la infraestructura, apagaré los servicios. En ese caso, la demostración dejará de estar disponible.
+
 TissueBank es una empresa colombiana dedicada a la distribución de tejidos ortopédicos donados a médicos cirujanos. El proceso anterior operaba en papel, Excel y WhatsApp; este proyecto lo digitaliza y automatiza de principio a fin: desde la solicitud del doctor hasta el despacho físico del tejido.
 
 ## Estructura del repositorio
