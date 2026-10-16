@@ -15,7 +15,7 @@ tissue_bank/
 ├── lambdas/            # Funciones Python que atienden las rutas de la API
 ├── scripts/            # Migraciones y consultas de mantenimiento SQL
 └── docs/               # Documentación funcional, presentación y diagramas
-    ├── Guia-de-uso.md             # Paso a paso de los paneles para doctor y administrador
+    ├── Guia-de-uso.md             # Manual de usuario del sitio web para doctor y administrador
     ├── Overview.md                # Contexto, arquitectura, roles, API y flujo del sistema
     ├── Presentacion.html          # Presentación del proyecto y demostración del MVP
     ├── Tissue.pdf                 # Formularios originales de solicitud de tejidos
@@ -27,7 +27,7 @@ tissue_bank/
 
 El frontend está en la raíz y no requiere compilación. `Index.html` carga `Styles.css`, `Data.js` y `App.js`; las acciones de los paneles en `App.js` consultan la API mediante `Data.js`. El backend vive en `lambdas/` y usa el modelo definido en `Schema.sql`.
 
-**Para usar la interfaz:** sigue la [guía paso a paso de los paneles](docs/Guia-de-uso.md), organizada por los roles doctor y administrador.
+**Para usar TissueBank:** entra al [sitio web](https://amazing-kataifi-34822a.netlify.app/) y sigue el [manual de usuario](docs/Guia-de-uso.md), organizado por los roles doctor y administrador. No necesitas descargar el repositorio ni abrir `Index.html` para usar la aplicación.
 
 ## Arquitectura
 

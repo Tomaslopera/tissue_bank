@@ -1,16 +1,17 @@
-# Guía de uso de los paneles de TissueBank
+# Manual de usuario de TissueBank
 
 [Volver al README](../README.md)
 
-Esta guía sigue el flujo que aparece en la interfaz. Hay dos roles: **doctor**, que crea solicitudes y responde a las propuestas de tejido, y **administrador**, que gestiona cuentas, inventario, recomendaciones, asignaciones y despachos. Los datos se consultan y guardan mediante la API configurada en `Data.js`.
+Esta guía explica cómo usar [TissueBank en la web](https://amazing-kataifi-34822a.netlify.app/). Hay dos roles: **doctor**, que crea solicitudes y responde a las propuestas de tejido, y **administrador**, que gestiona cuentas, inventario, recomendaciones, asignaciones y despachos.
 
 ## Antes de empezar
 
-1. Abre `Index.html` con un servidor estático, por ejemplo **Live Server** en VS Code.
-2. En **Iniciar sesión**, escribe el usuario y la contraseña de tu rol y pulsa **Entrar**. La pantalla muestra credenciales de demostración para doctor y administrador.
+1. Abre [https://amazing-kataifi-34822a.netlify.app/](https://amazing-kataifi-34822a.netlify.app/) en tu navegador.
+2. En **Iniciar sesión**, escribe el usuario y la contraseña de tu rol y pulsa **Entrar**. Si estás haciendo una demostración, puedes usar las credenciales que aparecen en la pantalla de inicio.
 3. Usa el menú lateral para cambiar de panel. El botón **ⓘ** junto al título de cada panel muestra una explicación breve dentro de la aplicación.
+4. Cuando termines, pulsa **Cerrar sesión** en la parte superior derecha.
 
-> La interfaz local está conectada al API Gateway configurado en `Data.js`. Crear solicitudes, doctores o implantes desde ella puede modificar los datos del entorno al que apunta esa API.
+> Las acciones que realices en el sitio web, como crear solicitudes, doctores o implantes, se guardan en el sistema. Usa datos adecuados para el entorno al que tienes acceso.
 
 ## Recorrido del doctor
 
