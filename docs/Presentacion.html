@@ -287,58 +287,6 @@ a:hover{opacity:.8}
   </div>
 </section>
 
-<!-- 6. Arquitectura -->
-<section class="slide">
-  <div class="head">
-    <div class="eyebrow">Cómo está construido</div>
-    <h2>Arquitectura del MVP</h2>
-  </div>
-  <div class="diagram">
-    <svg viewBox="0 0 1664 600" fill="none" stroke="#3C4A57" stroke-width="3">
-      <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3C4A57" stroke="none"/></marker></defs>
-      <path d="M150 195 L250 270" marker-end="url(#ah)"/>
-      <path d="M150 405 L250 330" marker-end="url(#ah)"/>
-      <path d="M460 300 L560 300" marker-end="url(#ah)"/>
-      <path d="M770 300 L870 300" marker-end="url(#ah)"/>
-      <path d="M1330 155 L1440 155" marker-end="url(#ah)"/>
-      <path d="M1330 445 L1440 445" marker-end="url(#ah)"/>
-    </svg>
-    <div class="node" style="left:0;top:150px;width:150px;height:90px"><b>Doctor</b></div>
-    <div class="node" style="left:0;top:360px;width:150px;height:90px"><b>Admin</b></div>
-    <div class="node front" style="left:250px;top:225px;width:210px;height:150px"><b>Netlify</b><span>Frontend HTML · CSS · JS</span></div>
-    <div class="node api" style="left:560px;top:225px;width:210px;height:150px"><b>API Gateway</b><span>HTTP API · CORS</span></div>
-    <div class="lbl" style="left:460px;top:258px">JWT</div>
-    <div class="lam">
-      <div><div class="t">AWS Lambda</div><div class="s">14 funciones · Python 3.12</div></div>
-      <div class="g"><div class="gl">Acceso</div><div class="m">auth_login · doctor</div></div>
-      <div class="g"><div class="gl">Datos maestros</div><div class="m">patient · ips · donor ·<br>implant · tissue_type</div></div>
-      <div class="g"><div class="gl">Pipeline</div><div class="m">request · request_status ·<br>match · match_engine ·<br>assignment · dispatch</div></div>
-      <div class="g"><div class="gl">Notificación</div><div class="m">notify</div></div>
-      <div class="layer">Layer compartido:<br><span class="mono">db.py · auth.py · response.py</span></div>
-    </div>
-    <div class="node db" style="left:1440px;top:40px;width:224px;height:230px"><b>Supabase</b><span>PostgreSQL<br>11 tablas<br>psycopg2</span></div>
-    <div class="node mail" style="left:1440px;top:330px;width:224px;height:230px"><b>Resend</b><span>Correo real<br>al doctor</span></div>
-    <div class="lbl" style="left:1330px;top:112px;width:110px">SQL</div>
-    <div class="lbl" style="left:1330px;top:402px;width:110px">HTTPS</div>
-  </div>
-</section>
-
-<!-- 7. Objetivo vs MVP -->
-<section class="slide">
-  <div class="head">
-    <div class="eyebrow">Del MVP al despliegue objetivo</div>
-    <h2>Lo que corre hoy y hacia dónde vamos</h2>
-  </div>
-  <div class="cmp">
-    <div class="th" style="border-bottom:3px solid var(--ink)">Componente</div><div class="th a">MVP (hoy)</div><div class="th b">Objetivo (producción)</div>
-    <div class="k">Frontend</div><div class="a">Netlify</div><div class="b">Amazon S3 + CloudFront</div>
-    <div class="k">Ejecución del matching</div><div class="a">Botón del administrador</div><div class="b">EventBridge cada 15 minutos</div>
-    <div class="k">Notificaciones</div><div class="a">Resend (correo real)</div><div class="b">Amazon SES</div>
-    <div class="k">Fotos de implantes</div><div class="a">Campo de URL; subida pendiente</div><div class="b">Amazon S3 con URLs firmadas</div>
-    <div class="k">Base de datos</div><div class="a">Supabase (PostgreSQL)</div><div class="b">Supabase o Amazon RDS, por decidir</div>
-    <div class="k">Prioridad clínica</div><div class="a">No implementada</div><div class="b">Automática según el tipo de caso</div>
-  </div>
-</section>
 
 <!-- 8. Proceso -->
 <section class="slide">
@@ -410,6 +358,59 @@ a:hover{opacity:.8}
     <div class="card"><h3>Despacho</h3><div class="chips"><span class="chip">por_etiquetar</span><span class="chip">etiquetado</span><span class="chip">en_camino</span><span class="chip">entregado</span></div></div>
   </div>
   <p style="color:var(--ink);margin-top:auto">En cualquier momento se audita qué médico pidió el tejido, de qué donante viene, qué se decidió y cuándo se entregó.</p>
+</section>
+
+<!-- 6. Arquitectura -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow">Cómo está construido</div>
+    <h2>Arquitectura del MVP</h2>
+  </div>
+  <div class="diagram">
+    <svg viewBox="0 0 1664 600" fill="none" stroke="#3C4A57" stroke-width="3">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#3C4A57" stroke="none"/></marker></defs>
+      <path d="M150 195 L250 270" marker-end="url(#ah)"/>
+      <path d="M150 405 L250 330" marker-end="url(#ah)"/>
+      <path d="M460 300 L560 300" marker-end="url(#ah)"/>
+      <path d="M770 300 L870 300" marker-end="url(#ah)"/>
+      <path d="M1330 155 L1440 155" marker-end="url(#ah)"/>
+      <path d="M1330 445 L1440 445" marker-end="url(#ah)"/>
+    </svg>
+    <div class="node" style="left:0;top:150px;width:150px;height:90px"><b>Doctor</b></div>
+    <div class="node" style="left:0;top:360px;width:150px;height:90px"><b>Admin</b></div>
+    <div class="node front" style="left:250px;top:225px;width:210px;height:150px"><b>Netlify</b><span>Frontend HTML · CSS · JS</span></div>
+    <div class="node api" style="left:560px;top:225px;width:210px;height:150px"><b>API Gateway</b><span>HTTP API · CORS</span></div>
+    <div class="lbl" style="left:460px;top:258px">JWT</div>
+    <div class="lam">
+      <div><div class="t">AWS Lambda</div><div class="s">14 funciones · Python 3.12</div></div>
+      <div class="g"><div class="gl">Acceso</div><div class="m">auth_login · doctor</div></div>
+      <div class="g"><div class="gl">Datos maestros</div><div class="m">patient · ips · donor ·<br>implant · tissue_type</div></div>
+      <div class="g"><div class="gl">Pipeline</div><div class="m">request · request_status ·<br>match · match_engine ·<br>assignment · dispatch</div></div>
+      <div class="g"><div class="gl">Notificación</div><div class="m">notify</div></div>
+      <div class="layer">Layer compartido:<br><span class="mono">db.py · auth.py · response.py</span></div>
+    </div>
+    <div class="node db" style="left:1440px;top:40px;width:224px;height:230px"><b>Supabase</b><span>PostgreSQL<br>11 tablas<br>psycopg2</span></div>
+    <div class="node mail" style="left:1440px;top:330px;width:224px;height:230px"><b>Resend</b><span>Correo real<br>al doctor</span></div>
+    <div class="lbl" style="left:1330px;top:112px;width:110px">SQL</div>
+    <div class="lbl" style="left:1330px;top:402px;width:110px">HTTPS</div>
+  </div>
+</section>
+
+<!-- 7. Objetivo vs MVP -->
+<section class="slide">
+  <div class="head">
+    <div class="eyebrow">Del MVP al despliegue objetivo</div>
+    <h2>Lo que corre hoy y hacia dónde vamos</h2>
+  </div>
+  <div class="cmp">
+    <div class="th" style="border-bottom:3px solid var(--ink)">Componente</div><div class="th a">MVP (hoy)</div><div class="th b">Objetivo (producción)</div>
+    <div class="k">Frontend</div><div class="a">Netlify</div><div class="b">Amazon S3 + CloudFront</div>
+    <div class="k">Ejecución del matching</div><div class="a">Botón del administrador</div><div class="b">EventBridge cada 15 minutos</div>
+    <div class="k">Notificaciones</div><div class="a">Resend (correo real)</div><div class="b">Amazon SES</div>
+    <div class="k">Fotos de implantes</div><div class="a">Campo de URL; subida pendiente</div><div class="b">Amazon S3 con URLs firmadas</div>
+    <div class="k">Base de datos</div><div class="a">Supabase (PostgreSQL)</div><div class="b">Supabase o Amazon RDS, por decidir</div>
+    <div class="k">Prioridad clínica</div><div class="a">No implementada</div><div class="b">Automática según el tipo de caso</div>
+  </div>
 </section>
 
 <!-- 11. Demo -->
@@ -540,9 +541,8 @@ a:hover{opacity:.8}
   <div class="road">
     <div class="it"><div class="n">1</div><h3>Despliegue objetivo en AWS</h3><p>S3 + CloudFront, EventBridge y Amazon SES.</p></div>
     <div class="it"><div class="n">2</div><h3>Prioridad clínica automática</h3><p>Urgente, alta, media o normal según el tipo de caso.</p></div>
-    <div class="it"><div class="n">3</div><h3>Códigos QR en las etiquetas</h3><p>Escaneo en cada punto de la cadena de custodia.</p></div>
-    <div class="it"><div class="n">4</div><h3>Gestión de recalls</h3><p>Identificar pacientes afectados por un lote de donante contaminado.</p></div>
-    <div class="it"><div class="n">5</div><h3>Dashboard de métricas</h3><p>Tasa de matching, tiempo de asignación y rechazo por médico.</p></div>
+    <div class="it"><div class="n">3</div><h3>Dashboard de métricas</h3><p>Tasa de matching, tiempo de asignación y rechazo por médico.</p></div>
+    <div class="it"><div class="n">4</div><h3>Tracking de envíos</h3><p>Trazabilidad de entradas y salidas.</p></div>
   </div>
 </section>
 
